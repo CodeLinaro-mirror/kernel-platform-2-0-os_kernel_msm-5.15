@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef __EP_PCIE_COM_H
@@ -139,6 +139,8 @@
 #define PCIE20_SRIOV_BAR_OFF(n)        (n * 0x4)
 #define PCIE20_SRIOV_BAR(n)            (PCIE20_SRIOV_BAR_OFF(n) + 0x24)
 #define PCIE20_TOTAL_VFS_INITIAL_VFS_REG 0xC
+#define PCIE20_VF_COMMAND_STATUS_OFF(n)  (n * 0x200)
+#define PCIE20_VF_COMMAND_STATUS(n)      (PCIE20_VF_COMMAND_STATUS_OFF(n) + 0x4)
 
 #define PCIE20_PLR_IATU_VIEWPORT       0x900
 #define PCIE20_PLR_IATU_CTRL1          0x904
@@ -402,6 +404,7 @@ struct ep_pcie_dev_t {
 	u32                          dbi_base_reg;
 	u32                          slv_space_reg;
 	u32                          phy_status_reg;
+	u32			     pcie_cesta_clkreq_offset;
 	u32			phy_status_bit_mask_bit;
 	u32                          phy_init_len;
 	u32			     mhi_soc_reset_offset;
@@ -467,6 +470,8 @@ struct ep_pcie_dev_t {
 	struct clk		     *pipe_clk_mux;
 	struct clk		     *pipe_clk_ext_src;
 	struct clk		     *ref_clk_src;
+
+	bool				override_disable_sriov;
 };
 
 extern struct ep_pcie_dev_t ep_pcie_dev;

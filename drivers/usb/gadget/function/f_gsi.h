@@ -68,6 +68,9 @@
 /* ID for Microsoft OS String */
 #define GSI_MBIM_OS_STRING_ID 0xEE
 
+static char compatible_id[256] = "ALTRCFG";
+static char sub_compatible_id[8];
+
 #define EVT_NONE			0
 #define EVT_UNINITIALIZED		1
 #define EVT_INITIALIZED			2
@@ -285,12 +288,14 @@ struct f_gsi {
 	struct gsi_ctrl_port c_port;
 	void *ipc_log_ctxt;
 	bool rmnet_dtr_status;
+	bool rmnet_use_tcm_mem;
 
 	/* To test remote wakeup using debugfs */
 	struct timer_list gsi_rw_timer;
 	u8 debugfs_rw_timer_enable;
 	u16 gsi_rw_timer_interval;
 	bool host_supports_flow_control;
+	bool ipa_ready_timeout;
 };
 
 static inline struct f_gsi *func_to_gsi(struct usb_function *f)

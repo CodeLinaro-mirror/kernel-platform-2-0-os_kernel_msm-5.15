@@ -358,7 +358,7 @@ int stmmac_mdio_reset(struct mii_bus *bus)
 	struct stmmac_priv *priv = netdev_priv(ndev);
 	unsigned int mii_address = priv->hw->mii.addr;
 
-	if (priv->early_eth)
+	if (priv->plat->early_eth)
 		return 0;
 
 #ifdef CONFIG_OF
@@ -378,18 +378,18 @@ int stmmac_mdio_reset(struct mii_bus *bus)
 					       "snps,reset-delays-us",
 					       delays, ARRAY_SIZE(delays));
 
-      if (priv->plat->reset_phy1_gpio) {
-         if (priv->plat->is_valid_eth_intf) {
-            reset_gpio = priv->plat->reset_phy1_gpio;
-            gpiod_set_value(reset_gpio, 1);
+		if (priv->plat->reset_phy1_gpio) {
+			if (priv->plat->is_valid_eth_intf) {
+				reset_gpio = priv->plat->reset_phy1_gpio;
+				gpiod_set_value(reset_gpio, 1);
 
-            device_property_read_u32_array(priv->device,
-                  "snps,phy1-reset-delays-us",
-                  delays, ARRAY_SIZE(delays));
-         }
-         else
-            gpiod_set_value(priv->plat->reset_phy1_gpio, 1);
-      }
+				device_property_read_u32_array(priv->device,
+							       "snps,phy1-reset-delays-us",
+								delays, ARRAY_SIZE(delays));
+			} else {
+				gpiod_set_value(priv->plat->reset_phy1_gpio, 1);
+			}
+		}
 
 		if (delays[0])
 			msleep(DIV_ROUND_UP(delays[0], 1000));
@@ -475,17 +475,19 @@ int stmmac_mdio_register(struct net_device *ndev)
 	if (mdio_bus_data->irqs)
 		memcpy(new_bus->irq, mdio_bus_data->irqs, sizeof(new_bus->irq));
 
-	new_bus->name = "stmmac";
+	if (priv->plat->port_num == 1)
+		new_bus->name = "stmmac_dev1";
+	else
+		new_bus->name = "stmmac_dev0";
 
-	if (priv->plat->has_gmac4) {
-		if (priv->plat->has_c22_mdio_probe_capability)
-			new_bus->probe_capabilities = MDIOBUS_C22;
-		else
-			new_bus->probe_capabilities = MDIOBUS_C22_C45;
-	}
+	if (priv->plat->has_c22_mdio_probe_capability)
+		new_bus->probe_capabilities = MDIOBUS_C22;
+	else if (priv->plat->has_c45_mdio_probe_capability)
+		new_bus->probe_capabilities = MDIOBUS_C45;
+	else
+		new_bus->probe_capabilities = MDIOBUS_C22_C45;
 
 	if (priv->plat->has_xgmac) {
-
 		if (priv->plat->is_valid_eth_intf)
 			new_bus->probe_capabilities = MDIOBUS_C45;
 

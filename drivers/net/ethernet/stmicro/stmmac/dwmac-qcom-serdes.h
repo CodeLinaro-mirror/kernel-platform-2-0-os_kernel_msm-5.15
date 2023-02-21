@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
-/* Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved. */
+/* Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved. */
 
 #ifndef	_DWMAC_QCOM_SERDES_H
 #define	_DWMAC_QCOM_SERDES_H
@@ -15,7 +15,7 @@
 #define QSERDES_QMP_PLL	0x0
 #define QSERDES_COM_ATB_SEL1	(QSERDES_QMP_PLL + 0x0)
 #define QSERDES_COM_ATB_SEL2	(QSERDES_QMP_PLL + 0x4)
-#define QSERDES_COM_BIAS_EN_CLKBUFLR_EN	(QSERDES_QMP_PLL + 0x44)
+#define QSERDES_COM_BIAS_EN_CLKBUFLR_EN	(QSERDES_QMP_PLL + 0xDC)
 #define QSERDES_COM_BIAS_EN_CTRL_BY_PSM	(QSERDES_QMP_PLL + 0x90)
 #define SGMII_PHY_0_QSERDES_COM_BG_TIMER		(QSERDES_QMP_PLL + 0xBC)
 #define QSERDES_COM_BIN_VCOCAL_CMP_CODE1_MODE0	(QSERDES_QMP_PLL + 0x58)
@@ -436,6 +436,12 @@
 #define QSERDES_PCS2_RX_LANE1_0_STATUS (QSERDES_PCS_2 + 0x2C)
 #define QSERDES_PCS2_RX_LANE1_1_STATUS (QSERDES_PCS_2 + 0x30)
 #define QSERDES_PCS2_RX_LANE1_3_STATUS (QSERDES_PCS_2 + 0x34)
+
+enum USXGMII_MODES {
+		USXGMII_MODE_10G,
+		USXGMII_MODE_5G,
+		USXGMII_MODE_2P5G,
+};
 
 #if IS_ENABLED(CONFIG_ETHQOS_QCOM_SERDES)
 int qcom_ethqos_serdes_configure_dt(struct qcom_ethqos *ethqos);

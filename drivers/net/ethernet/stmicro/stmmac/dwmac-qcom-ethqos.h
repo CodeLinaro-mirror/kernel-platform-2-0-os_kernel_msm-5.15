@@ -16,9 +16,10 @@
 #include <linux/uaccess.h>
 #include <linux/ipc_logging.h>
 #include <linux/interconnect.h>
+#include <linux/qtee_shmbridge.h>
 
-#define QCOM_ETH_QOS_MAC_ADDR_LEN
-#define QCOM_ETH_QOS_MAC_ADDR_STR_LEN
+#define QCOM_ETH_QOS_MAC_ADDR_LEN 6
+#define QCOM_ETH_QOS_MAC_ADDR_STR_LEN 18
 
 extern void *ipc_stmmac_log_ctxt;
 extern void *ipc_stmmac_log_ctxt_low;
@@ -109,17 +110,27 @@ do {\
 #define ETHQOS_CONFIG_PPSOUT_CMD 44
 #define ETHQOS_AVB_ALGORITHM 27
 
-#define MAC_PPS_CONTROL			0x00000b70
 #define PPS_MAXIDX(x)			((((x) + 1) * 8) - 1)
 #define PPS_MINIDX(x)			((x) * 8)
 #define MCGRENX(x)			BIT(PPS_MAXIDX(x))
 #define PPSEN0				BIT(4)
-#define MAC_PPSX_TARGET_TIME_SEC(x)	(0x00000b80 + ((x) * 0x10))
-#define MAC_PPSX_TARGET_TIME_NSEC(x)	(0x00000b84 + ((x) * 0x10))
+
+#if IS_ENABLED(CONFIG_DWXGMAC_QCOM_4K)
+	#define MAC_PPS_CONTROL		0x000007070
+	#define MAC_PPSX_TARGET_TIME_SEC(x)	(0x00007080 + ((x) * 0x10))
+	#define MAC_PPSX_TARGET_TIME_NSEC(x)	(0x00007084 + ((x) * 0x10))
+	#define MAC_PPSX_INTERVAL(x)		(0x00007088 + ((x) * 0x10))
+	#define MAC_PPSX_WIDTH(x)		(0x0000708c + ((x) * 0x10))
+#else
+	#define MAC_PPS_CONTROL		0x00000b70
+	#define MAC_PPSX_TARGET_TIME_SEC(x)	(0x00000b80 + ((x) * 0x10))
+	#define MAC_PPSX_TARGET_TIME_NSEC(x)	(0x00000b84 + ((x) * 0x10))
+	#define MAC_PPSX_INTERVAL(x)		(0x00000b88 + ((x) * 0x10))
+	#define MAC_PPSX_WIDTH(x)		(0x00000b8c + ((x) * 0x10))
+#endif
+
 #define TRGTBUSY0			BIT(31)
 #define TTSL0				GENMASK(30, 0)
-#define MAC_PPSX_INTERVAL(x)		(0x00000b88 + ((x) * 0x10))
-#define MAC_PPSX_WIDTH(x)		(0x00000b8c + ((x) * 0x10))
 
 #define PPS_START_DELAY 100000000
 #define ONE_NS 1000000000
@@ -145,6 +156,14 @@ do {\
 #define VOTE_IDX_5000MBPS 5
 #define VOTE_IDX_10000MBPS 6
 
+//Mac config
+#define XGMAC_RX_CONFIG		0x00000004
+#define XGMAC_CONFIG_LM			BIT(10)
+
+//Mac config
+#define XGMAC_RX_CONFIG		0x00000004
+#define XGMAC_CONFIG_LM			BIT(10)
+
 static inline u32 PPSCMDX(u32 x, u32 val)
 {
 	return (GENMASK(PPS_MINIDX(x) + 3, PPS_MINIDX(x)) &
@@ -163,9 +182,29 @@ static inline u32 PPSX_MASK(u32 x)
 }
 
 enum IO_MACRO_PHY_MODE {
-		RGMII_MODE,
-		RMII_MODE,
-		MII_MODE
+	RGMII_MODE,
+	RMII_MODE,
+	MII_MODE
+};
+
+enum loopback_mode {
+	DISABLE_LOOPBACK = 0,
+	ENABLE_IO_MACRO_LOOPBACK,
+	ENABLE_MAC_LOOPBACK,
+	ENABLE_PHY_LOOPBACK
+};
+
+enum phy_power_mode {
+	DISABLE_PHY_IMMEDIATELY = 1,
+	ENABLE_PHY_IMMEDIATELY,
+	DISABLE_PHY_AT_SUSPEND_ONLY,
+	DISABLE_PHY_SUSPEND_ENABLE_RESUME,
+	DISABLE_PHY_ON_OFF,
+};
+
+enum current_phy_state {
+	PHY_IS_ON = 0,
+	PHY_IS_OFF,
 };
 
 struct ethqos_emac_por {
@@ -265,7 +304,10 @@ struct qcom_ethqos {
 	void __iomem *rgmii_base;
 	void __iomem *sgmii_base;
 	void __iomem *ioaddr;
-
+	u32 rgmii_phy_base;
+	struct qtee_shm shm_rgmii_hsr;
+	struct qtee_shm shm_rgmii_local;
+	phys_addr_t phys_rgmii_hsr_por;
 	struct msm_bus_scale_pdata *bus_scale_vec;
 	u32 bus_hdl;
 	unsigned int rgmii_clk_rate;
@@ -295,12 +337,15 @@ struct qcom_ethqos {
 	unsigned int speed;
 	unsigned int vote_idx;
 
+	/* Serdes clocks will be set based on PHY max speed */
+	unsigned int usxgmii_mode;
+
 	int gpio_phy_intr_redirect;
 	u32 phy_intr;
 	/* Work struct for handling phy interrupt */
 	struct work_struct emac_phy_work;
 
-	const struct ethqos_emac_por *por;
+	struct ethqos_emac_por *por;
 	unsigned int num_por;
 	unsigned int emac_ver;
 
@@ -349,6 +394,20 @@ struct qcom_ethqos {
 	bool print_kpi;
 	struct dentry *debugfs_dir;
 	int curr_serdes_speed;
+	unsigned int emac_phy_off_suspend;
+	int loopback_speed;
+	enum loopback_mode current_loopback;
+	enum phy_power_mode current_phy_mode;
+	enum current_phy_state phy_state;
+	/*Backup variable for phy loopback*/
+	int backup_duplex;
+	int backup_speed;
+	u32 bmcr_backup;
+	/*Backup variable for suspend resume*/
+	int backup_suspend_speed;
+	u32 backup_bmcr;
+	unsigned backup_autoneg:1;
+	bool probed;
 };
 
 struct pps_cfg {
@@ -391,7 +450,6 @@ struct ip_params {
 	unsigned char mac_addr[QCOM_ETH_QOS_MAC_ADDR_LEN];
 };
 
-
 struct mac_params {
 	phy_interface_t eth_intf;
 	bool is_valid_eth_intf;
@@ -410,6 +468,9 @@ bool qcom_ethqos_is_phy_link_up(struct qcom_ethqos *ethqos);
 void *qcom_ethqos_get_priv(struct qcom_ethqos *ethqos);
 
 int ppsout_config(struct stmmac_priv *priv, struct pps_cfg *eth_pps_cfg);
+int ethqos_phy_power_on(struct qcom_ethqos *ethqos);
+void  ethqos_phy_power_off(struct qcom_ethqos *ethqos);
+void ethqos_reset_phy_enable_interrupt(struct qcom_ethqos *ethqos);
 
 u16 dwmac_qcom_select_queue(struct net_device *dev,
 			    struct sk_buff *skb,
@@ -469,7 +530,5 @@ void dwmac_qcom_program_avb_algorithm(struct stmmac_priv *priv,
 				      struct ifr_data_struct *req);
 unsigned int dwmac_qcom_get_plat_tx_coal_frames(struct sk_buff *skb);
 int ethqos_init_pps(void *priv);
-
-int ethqos_dll_configure_v4(struct qcom_ethqos *ethqos);
-
+unsigned int dwmac_qcom_get_eth_type(unsigned char *buf);
 #endif

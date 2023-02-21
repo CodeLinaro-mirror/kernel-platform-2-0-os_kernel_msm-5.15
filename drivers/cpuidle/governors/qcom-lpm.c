@@ -351,7 +351,8 @@ static void update_cpu_history(struct lpm_cpu *cpu_gov)
 	u64 measured_us = ktime_to_us(cpu_gov->dev->last_residency_ns);
 	struct cpuidle_state *target;
 
-	if (prediction_disabled || idx < 0 || idx > cpu_gov->drv->state_count - 1)
+	if (sleep_disabled || prediction_disabled || idx < 0 ||
+	    idx > cpu_gov->drv->state_count - 1)
 		return;
 
 	target = &cpu_gov->drv->states[idx];
@@ -534,6 +535,14 @@ static int start_prediction_timer(struct lpm_cpu *cpu_gov, int duration_us)
 	return htime;
 }
 
+void unregister_cluster_governor_ops(struct cluster_governor *ops)
+{
+	if (ops != cluster_gov_ops)
+		return;
+
+	cluster_gov_ops = NULL;
+}
+
 void register_cluster_governor_ops(struct cluster_governor *ops)
 {
 	if (!ops)
@@ -578,7 +587,7 @@ static int lpm_select(struct cpuidle_driver *drv, struct cpuidle_device *dev,
 	for (i = drv->state_count - 1; i > 0; i--) {
 		struct cpuidle_state *s = &drv->states[i];
 
-		if (i && dev->states_usage[i].disable) {
+		if (dev->states_usage[i].disable) {
 			reason |= UPDATE_REASON(i, LPM_SELECT_STATE_DISABLED);
 			continue;
 		}

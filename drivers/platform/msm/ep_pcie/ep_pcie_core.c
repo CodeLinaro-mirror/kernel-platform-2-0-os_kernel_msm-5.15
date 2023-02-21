@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /*
@@ -729,10 +729,13 @@ static void ep_pcie_config_mmio(struct ep_pcie_dev_t *dev)
 	dev->config_mmio_init = true;
 }
 
-static int ep_pcie_sriov_init(struct ep_pcie_dev_t *dev)
+static void ep_pcie_sriov_init(struct ep_pcie_dev_t *dev)
 {
 	void __iomem *dbi = ep_pcie_dev.dm_core;
 	u32 reg;
+
+	if (ep_pcie_dev.override_disable_sriov)
+		return;
 
 	ep_pcie_dev.sriov_cap = ep_pcie_find_ext_capability(dev, PCI_EXT_CAP_ID_SRIOV);
 	if (ep_pcie_dev.sriov_cap) {
@@ -744,7 +747,6 @@ static int ep_pcie_sriov_init(struct ep_pcie_dev_t *dev)
 		EP_PCIE_INFO(&ep_pcie_dev, "PCIe V%d: Number of VFs: %d, SR-IOV mask: 0x%x\n",
 				ep_pcie_dev.rev, ep_pcie_dev.num_vfs, ep_pcie_dev.sriov_mask);
 	}
-	return 0;
 }
 
 static void ep_pcie_core_init(struct ep_pcie_dev_t *dev, bool configured)
@@ -1061,7 +1063,6 @@ static void ep_pcie_core_init(struct ep_pcie_dev_t *dev, bool configured)
 	}
 
 	ep_pcie_sriov_init(dev);
-
 	if (!configured) {
 		ep_pcie_config_mmio(dev);
 		ep_pcie_config_inbound_iatu(dev, PCIE_PHYSICAL_DEVICE);
@@ -1082,7 +1083,7 @@ static void ep_pcie_core_init(struct ep_pcie_dev_t *dev, bool configured)
 static void ep_pcie_config_inbound_iatu(struct ep_pcie_dev_t *dev, u32 vf_id)
 {
 	struct resource *mmio = dev->res[EP_PCIE_RES_MMIO].resource;
-	u32 lower, limit, bar, size, vf_num;
+	u32 lower, limit, bar, size, vf_num = 0;
 
 	lower = mmio->start;
 	limit = mmio->end;
@@ -2016,6 +2017,10 @@ int ep_pcie_core_enable_endpoint(enum ep_pcie_options opt)
 			writel_relaxed(0, dev->tcsr_perst_en +
 						TCSR_PERST_SEPARATION_ENABLE);
 		}
+
+		if (dev->pcie_cesta_clkreq_offset)
+			ep_pcie_write_reg_field(dev->parf,
+						dev->pcie_cesta_clkreq_offset, BIT(0), 0);
 
 		 /* check link status during initial bootup */
 		if (!dev->enumerated) {
@@ -3112,6 +3117,9 @@ void ep_pcie_irq_deinit(struct ep_pcie_dev_t *dev)
 
 int ep_pcie_core_register_event(struct ep_pcie_register_event *reg)
 {
+	void __iomem *dbi = ep_pcie_dev.dm_core_vf;
+	u32 bme, vf_id;
+
 	if (!reg) {
 		EP_PCIE_ERR(&ep_pcie_dev,
 			"PCIe V%d: Event registration is NULL\n",
@@ -3132,6 +3140,24 @@ int ep_pcie_core_register_event(struct ep_pcie_register_event *reg)
 		ep_pcie_dev.rev, reg->events);
 
 	ep_pcie_dev.client_ready = true;
+
+	/*
+	 * When EP undergoes a warmboot, the config spaceand BME of VF
+	 * instances are kept intact by the host. Hence there is no BME
+	 * IRQ triggered. Check for BME on VF DBI space and generate
+	 * LINKUP_VF event if BME is set.
+	 */
+	if (reg->events & EP_PCIE_EVENT_LINKUP_VF) {
+		for (vf_id = 0; vf_id < ep_pcie_dev.num_vfs; vf_id++) {
+			bme = readl_relaxed(dbi +
+				(PCIE20_VF_COMMAND_STATUS(vf_id))) & BIT(2);
+			if (bme && !(ep_pcie_dev.sriov_enumerated & BIT(vf_id))) {
+				ep_pcie_notify_vf_bme_event(&ep_pcie_dev,
+					EP_PCIE_EVENT_LINKUP_VF, vf_id + 1);
+				ep_pcie_dev.sriov_enumerated |= BIT(vf_id);
+			}
+		}
+	}
 
 	return 0;
 }
@@ -3829,6 +3855,8 @@ static int ep_pcie_probe(struct platform_device *pdev)
 						(&pdev->dev)->of_node,
 						"qcom,db-fwd-off-varied");
 
+	ep_pcie_dev.override_disable_sriov = of_property_read_bool((&pdev->dev)->of_node,
+						"qcom,override-disable-sriov");
 	ep_pcie_dev.rev = 1711211;
 	ep_pcie_dev.pdev = pdev;
 	ep_pcie_dev.m2_autonomous =
@@ -3881,6 +3909,12 @@ static int ep_pcie_probe(struct platform_device *pdev)
 	EP_PCIE_DBG(&ep_pcie_dev,
 		"PCIe V%d: pcie edma is %s enabled\n",
 		ep_pcie_dev.rev, ep_pcie_dev.use_iatu_msi ? "" : "not");
+
+	ret = of_property_read_u32((&pdev->dev)->of_node,
+				"qcom,pcie-cesta-clkreq-offset",
+				&ep_pcie_dev.pcie_cesta_clkreq_offset);
+	if (ret)
+		ep_pcie_dev.pcie_cesta_clkreq_offset = 0;
 
 	memcpy(ep_pcie_dev.vreg, ep_pcie_vreg_info,
 				sizeof(ep_pcie_vreg_info));

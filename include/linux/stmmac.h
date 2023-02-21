@@ -247,6 +247,7 @@ struct plat_stmmacenet_data {
 	int (*crosststamp)(ktime_t *device, struct system_counterval_t *system,
 			   void *ctx);
 	void (*dump_debug_regs)(void *priv);
+	unsigned int (*get_eth_type)(unsigned char *buf);
 	void *bsp_priv;
 	struct clk *stmmac_clk;
 	struct clk *pclk;
@@ -289,6 +290,7 @@ struct plat_stmmacenet_data {
 	struct emac_emb_smmu_cb_ctx stmmac_emb_smmu_ctx;
 	bool phy_intr_en_extn_stm;
 	int has_c22_mdio_probe_capability;
+	int has_c45_mdio_probe_capability;
 	u16	(*tx_select_queue)
 		(struct net_device *dev, struct sk_buff *skb,
 		 struct net_device *sb_dev);
@@ -305,5 +307,7 @@ struct plat_stmmacenet_data {
 	bool sph_disable;
 	void (*phy_irq_enable)(void *priv);
 	void (*phy_irq_disable)(void *priv);
+	int port_num;
+	bool force_thresh_dma_mode_q0_en;
 };
 #endif

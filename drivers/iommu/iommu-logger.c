@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/bitfield.h>
 #include <linux/module.h>
 #include <linux/iommu.h>
+#include <linux/qcom-io-pgtable.h>
 #include <linux/slab.h>
-#include "qcom-io-pgtable.h"
 
 #include "iommu-logger.h"
 
@@ -25,6 +26,7 @@ static unsigned int iommu_logger_pgtable_levels(struct io_pgtable *iop)
 #ifdef CONFIG_IOMMU_IO_PGTABLE_FAST
 	case ARM_V8L_FAST:
 #endif
+	case QCOM_ARM_32_LPAE_S1:
 	case QCOM_ARM_64_LPAE_S1:
 		pte_size = sizeof(u64);
 		break;
@@ -43,6 +45,7 @@ static enum iommu_logger_pgtable_fmt iommu_logger_pgtable_fmt_lut(
 {
 	switch ((u32)fmt) {
 	case ARM_32_LPAE_S1:
+	case QCOM_ARM_32_LPAE_S1:
 		return IOMMU_LOGGER_ARM_32_LPAE_S1;
 	case ARM_64_LPAE_S1:
 #ifdef CONFIG_IOMMU_IO_PGTABLE_FAST
@@ -67,6 +70,7 @@ static int iommu_logger_domain_ttbrs(struct io_pgtable *iop, void **ttbr0_ptr,
 #ifdef CONFIG_IOMMU_IO_PGTABLE_FAST
 	case ARM_V8L_FAST:
 #endif
+	case QCOM_ARM_32_LPAE_S1:
 	case QCOM_ARM_64_LPAE_S1:
 		ttbr0 = iop->cfg.arm_lpae_s1_cfg.ttbr;
 		ret = 0;

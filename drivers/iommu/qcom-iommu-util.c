@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/dma-mapping-fast.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/qcom-iommu-util.h>
+#include <linux/qcom-io-pgtable.h>
 #include "qcom-dma-iommu-generic.h"
-#include "qcom-io-pgtable.h"
 #include "qcom-io-pgtable-alloc.h"
 
 struct qcom_iommu_range_prop_cb_data {
@@ -436,6 +437,8 @@ struct io_pgtable_ops *qcom_alloc_io_pgtable_ops(enum io_pgtable_fmt fmt,
 #ifdef CONFIG_IOMMU_IO_PGTABLE_LPAE
 	else if (fmt == QCOM_ARM_64_LPAE_S1)
 		fns = &qcom_io_pgtable_arm_64_lpae_s1_init_fns;
+	else if (fmt == QCOM_ARM_32_LPAE_S1)
+		fns = &qcom_io_pgtable_arm_32_lpae_s1_init_fns;
 #endif
 	else {
 		pr_err("Invalid io-pgtable fmt %u\n", fmt);
@@ -474,6 +477,8 @@ void qcom_free_io_pgtable_ops(struct io_pgtable_ops *ops)
 #ifdef CONFIG_IOMMU_IO_PGTABLE_LPAE
 	else if (fmt == QCOM_ARM_64_LPAE_S1)
 		fns = &qcom_io_pgtable_arm_64_lpae_s1_init_fns;
+	else if (fmt == QCOM_ARM_32_LPAE_S1)
+		fns = &qcom_io_pgtable_arm_32_lpae_s1_init_fns;
 #endif
 	else {
 		pr_err("Invalid io-pgtable fmt %u\n", fmt);
