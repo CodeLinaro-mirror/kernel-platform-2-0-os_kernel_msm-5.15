@@ -16,13 +16,13 @@
 #include <linux/uaccess.h>
 #include <linux/ipc_logging.h>
 #include <linux/interconnect.h>
+#include <linux/qtee_shmbridge.h>
 
-#define QCOM_ETH_QOS_MAC_ADDR_LEN
-#define QCOM_ETH_QOS_MAC_ADDR_STR_LEN
+#define QCOM_ETH_QOS_MAC_ADDR_LEN 6
+#define QCOM_ETH_QOS_MAC_ADDR_STR_LEN 18
 
 extern void *ipc_stmmac_log_ctxt;
 extern void *ipc_stmmac_log_ctxt_low;
-extern void *ipc_emac_log_ctxt;
 
 #define IPCLOG_STATE_PAGES 50
 #define IPC_RATELIMIT_BURST 1
@@ -109,17 +109,27 @@ do {\
 #define ETHQOS_CONFIG_PPSOUT_CMD 44
 #define ETHQOS_AVB_ALGORITHM 27
 
-#define MAC_PPS_CONTROL			0x00000b70
 #define PPS_MAXIDX(x)			((((x) + 1) * 8) - 1)
 #define PPS_MINIDX(x)			((x) * 8)
 #define MCGRENX(x)			BIT(PPS_MAXIDX(x))
 #define PPSEN0				BIT(4)
-#define MAC_PPSX_TARGET_TIME_SEC(x)	(0x00000b80 + ((x) * 0x10))
-#define MAC_PPSX_TARGET_TIME_NSEC(x)	(0x00000b84 + ((x) * 0x10))
+
+#if IS_ENABLED(CONFIG_DWXGMAC_QCOM_4K)
+	#define MAC_PPS_CONTROL		0x000007070
+	#define MAC_PPSX_TARGET_TIME_SEC(x)	(0x00007080 + ((x) * 0x10))
+	#define MAC_PPSX_TARGET_TIME_NSEC(x)	(0x00007084 + ((x) * 0x10))
+	#define MAC_PPSX_INTERVAL(x)		(0x00007088 + ((x) * 0x10))
+	#define MAC_PPSX_WIDTH(x)		(0x0000708c + ((x) * 0x10))
+#else
+	#define MAC_PPS_CONTROL		0x00000b70
+	#define MAC_PPSX_TARGET_TIME_SEC(x)	(0x00000b80 + ((x) * 0x10))
+	#define MAC_PPSX_TARGET_TIME_NSEC(x)	(0x00000b84 + ((x) * 0x10))
+	#define MAC_PPSX_INTERVAL(x)		(0x00000b88 + ((x) * 0x10))
+	#define MAC_PPSX_WIDTH(x)		(0x00000b8c + ((x) * 0x10))
+#endif
+
 #define TRGTBUSY0			BIT(31)
 #define TTSL0				GENMASK(30, 0)
-#define MAC_PPSX_INTERVAL(x)		(0x00000b88 + ((x) * 0x10))
-#define MAC_PPSX_WIDTH(x)		(0x00000b8c + ((x) * 0x10))
 
 #define PPS_START_DELAY 100000000
 #define ONE_NS 1000000000
@@ -144,6 +154,16 @@ do {\
 #define VOTE_IDX_2500MBPS 4
 #define VOTE_IDX_5000MBPS 5
 #define VOTE_IDX_10000MBPS 6
+
+#if IS_ENABLED(CONFIG_ETHQOS_QCOM_VER4)
+enum ipa_queue_type {
+	IPA_QUEUE_BE = 0,
+};
+#endif
+
+//Mac config
+#define XGMAC_RX_CONFIG		0x00000004
+#define XGMAC_CONFIG_LM			BIT(10)
 
 //Mac config
 #define XGMAC_RX_CONFIG		0x00000004
@@ -190,6 +210,13 @@ enum phy_power_mode {
 enum current_phy_state {
 	PHY_IS_ON = 0,
 	PHY_IS_OFF,
+};
+
+struct ethqos_vlan_info {
+	u16 vlan_id;
+	u32 vlan_offset;
+	u32 rx_queue;
+	bool available;
 };
 
 struct ethqos_emac_por {
@@ -289,7 +316,10 @@ struct qcom_ethqos {
 	void __iomem *rgmii_base;
 	void __iomem *sgmii_base;
 	void __iomem *ioaddr;
-
+	u32 rgmii_phy_base;
+	struct qtee_shm shm_rgmii_hsr;
+	struct qtee_shm shm_rgmii_local;
+	phys_addr_t phys_rgmii_hsr_por;
 	struct msm_bus_scale_pdata *bus_scale_vec;
 	u32 bus_hdl;
 	unsigned int rgmii_clk_rate;
@@ -319,12 +349,15 @@ struct qcom_ethqos {
 	unsigned int speed;
 	unsigned int vote_idx;
 
+	/* Serdes clocks will be set based on PHY max speed */
+	unsigned int usxgmii_mode;
+
 	int gpio_phy_intr_redirect;
 	u32 phy_intr;
 	/* Work struct for handling phy interrupt */
 	struct work_struct emac_phy_work;
 
-	const struct ethqos_emac_por *por;
+	struct ethqos_emac_por *por;
 	unsigned int num_por;
 	unsigned int emac_ver;
 
@@ -351,6 +384,11 @@ struct qcom_ethqos {
 	struct emac_icc_data *emac_axi_icc;
 	struct icc_path *apb_icc_path;
 	struct emac_icc_data *emac_apb_icc;
+
+	dev_t emac_dev_t;
+	struct cdev *emac_cdev;
+	struct class *emac_class;
+
 	unsigned long avb_class_a_intr_cnt;
 	unsigned long avb_class_b_intr_cnt;
 
@@ -386,6 +424,12 @@ struct qcom_ethqos {
 	int backup_suspend_speed;
 	u32 backup_bmcr;
 	unsigned backup_autoneg:1;
+	bool probed;
+	bool ipa_enabled;
+
+	/* QMI over ethernet parameter */
+	u32 qoe_mode;
+	struct ethqos_vlan_info qoe_vlan;
 };
 
 struct pps_cfg {
@@ -463,6 +507,8 @@ u16 dwmac_qcom_select_queue(struct net_device *dev,
 #define IPA_DMA_TX_CH 0
 #define IPA_DMA_RX_CH 0
 
+#define QMI_TAG_TX_CHANNEL 2
+
 #define VLAN_TAG_UCP_SHIFT 13
 #define CLASS_A_TRAFFIC_UCP 3
 #define CLASS_A_TRAFFIC_TX_CHANNEL 3
@@ -508,6 +554,5 @@ void dwmac_qcom_program_avb_algorithm(struct stmmac_priv *priv,
 				      struct ifr_data_struct *req);
 unsigned int dwmac_qcom_get_plat_tx_coal_frames(struct sk_buff *skb);
 int ethqos_init_pps(void *priv);
-int ethqos_dll_configure_v4(struct qcom_ethqos *ethqos);
 unsigned int dwmac_qcom_get_eth_type(unsigned char *buf);
 #endif

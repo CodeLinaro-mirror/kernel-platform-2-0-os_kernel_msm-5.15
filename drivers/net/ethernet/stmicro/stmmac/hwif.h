@@ -98,6 +98,9 @@ struct stmmac_desc_ops {
 			     u32 inner_type);
 	void (*set_vlan)(struct dma_desc *p, u32 type);
 	void (*set_tbs)(struct dma_edesc *p, u32 sec, u32 nsec);
+#if IS_ENABLED(CONFIG_ETHQOS_QCOM_VER4)
+	void (*set_hw_ts)(struct dma_desc *p, u32 pid);
+#endif
 };
 
 #define stmmac_init_rx_desc(__priv, __args...) \
@@ -162,6 +165,10 @@ struct stmmac_desc_ops {
 	stmmac_do_void_callback(__priv, desc, set_vlan, __args)
 #define stmmac_set_desc_tbs(__priv, __args...) \
 	stmmac_do_void_callback(__priv, desc, set_tbs, __args)
+#if IS_ENABLED(CONFIG_ETHQOS_QCOM_VER4)
+#define stmmac_set_desc_hw_ts(__priv, __args...) \
+	stmmac_do_void_callback(__priv, desc, set_hw_ts, __args)
+#endif
 
 struct stmmac_dma_cfg;
 struct dma_features;
@@ -284,6 +291,7 @@ struct stmmac_tc_entry;
 struct stmmac_pps_cfg;
 struct stmmac_rss;
 struct stmmac_est;
+struct vlan_filter_info;
 
 /* Helpers to program the MAC core */
 struct stmmac_ops {
@@ -391,6 +399,8 @@ struct stmmac_ops {
 				bool en, bool udp, bool sa, bool inv,
 				u32 match);
 	void (*set_arp_offload)(struct mac_device_info *hw, bool en, u32 addr);
+	/* Enable the VLAN MAC configuration for DMA Queue*/
+	void (*qcom_set_vlan)(struct vlan_filter_info *vlan, void __iomem *ioaddr);
 	int (*est_configure)(void __iomem *ioaddr, struct stmmac_est *cfg,
 			     unsigned int ptp_rate);
 	void (*est_irq_status)(void __iomem *ioaddr, struct net_device *dev,

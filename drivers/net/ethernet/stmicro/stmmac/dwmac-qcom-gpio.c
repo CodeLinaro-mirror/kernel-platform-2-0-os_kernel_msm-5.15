@@ -272,7 +272,7 @@ int ethqos_init_pinctrl(struct device *dev)
 			return ret;
 		}
 
-		ETHQOSINFO("pinctrl_lookup_state %s succeeded\n", name);
+		ETHQOSDBG("pinctrl_lookup_state %s succeeded\n", name);
 
 		ret = pinctrl_select_state(pinctrl, pinctrl_state);
 		if (ret) {
@@ -280,7 +280,7 @@ int ethqos_init_pinctrl(struct device *dev)
 			return ret;
 		}
 
-		ETHQOSINFO("pinctrl_select_state %s succeeded\n", name);
+		ETHQOSDBG("pinctrl_select_state %s succeeded\n", name);
 	}
 
 	return ret;
@@ -299,14 +299,16 @@ int ethqos_init_gpio(struct qcom_ethqos *ethqos)
 		return ret;
 	}
 
-	ret = setup_gpio_input_common(&ethqos->pdev->dev,
-				      "qcom,phy-intr-redirect",
-			&ethqos->gpio_phy_intr_redirect);
+	if (of_property_read_bool(ethqos->pdev->dev.of_node, "qcom,phy-intr-redirect")) {
+		ret = setup_gpio_input_common(&ethqos->pdev->dev,
+					      "qcom,phy-intr-redirect",
+				&ethqos->gpio_phy_intr_redirect);
 
-	if (ret) {
-		ETHQOSERR("Failed to setup <%s> gpio\n",
-			  "qcom,phy-intr-redirect");
-		goto gpio_error;
+		if (ret) {
+			ETHQOSERR("Failed to setup <%s> gpio\n",
+				  "qcom,phy-intr-redirect");
+			goto gpio_error;
+		}
 	}
 
 	return ret;
