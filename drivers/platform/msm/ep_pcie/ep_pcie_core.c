@@ -32,6 +32,7 @@
 #include <linux/irq.h>
 #include <linux/interconnect.h>
 #include <linux/pci_regs.h>
+#include <linux/nvmem-consumer.h>
 
 #include "ep_pcie_com.h"
 #include <linux/dma-mapping.h>
@@ -135,6 +136,40 @@ static const struct ep_pcie_irq_info_t ep_pcie_irq_info[EP_PCIE_MAX_IRQ] = {
 
 static int ep_pcie_core_wakeup_host_internal(enum ep_pcie_event event);
 static void ep_pcie_config_inbound_iatu(struct ep_pcie_dev_t *dev, u32 vf_id);
+
+/*
+ * ep_pcie_clk_dump - Clock CBCR reg info will be dumped in Dmesg logs.
+ * @dev: PCIe endpoint device structure.
+ */
+void ep_pcie_clk_dump(struct ep_pcie_dev_t *dev)
+{
+	struct ep_pcie_clk_info_t *info;
+	int i;
+
+	for (i = 0; i < EP_PCIE_MAX_CLK; i++) {
+		info = &dev->clk[i];
+
+		if (!info->hdl) {
+			EP_PCIE_DBG(dev,
+				"PCIe V%d:  handle of Clock %s is NULL\n",
+				dev->rev, info->name);
+		} else {
+			qcom_clk_dump(info->hdl, NULL, 0);
+		}
+	}
+
+	for (i = 0; i < EP_PCIE_MAX_PIPE_CLK; i++) {
+		info = &dev->pipeclk[i];
+
+		if (!info->hdl) {
+			EP_PCIE_ERR(dev,
+				"PCIe V%d:  handle of Pipe Clock %s is NULL\n",
+				dev->rev, info->name);
+		} else {
+			qcom_clk_dump(info->hdl, NULL, 0);
+		}
+	}
+}
 
 int ep_pcie_get_debug_mask(void)
 {
@@ -438,17 +473,20 @@ static int ep_pcie_clk_init(struct ep_pcie_dev_t *dev)
 	EP_PCIE_DBG(dev, "PCIe V%d\n", dev->rev);
 
 	rc = regulator_enable(dev->gdsc);
-
 	if (rc) {
 		EP_PCIE_ERR(dev, "PCIe V%d: fail to enable GDSC for %s\n",
 			dev->rev, dev->pdev->name);
 		return rc;
 	}
 
-	rc = regulator_enable(dev->gdsc_phy);
-	if (rc) {
-		EP_PCIE_ERR(dev, "PCIe V%d: fail to enable GDSC_PHY for %s\n",
-			dev->rev, dev->pdev->name);
+	if (dev->gdsc_phy) {
+		rc = regulator_enable(dev->gdsc_phy);
+		if (rc) {
+			EP_PCIE_ERR(dev, "PCIe V%d: fail to enable GDSC_PHY for %s\n",
+					dev->rev, dev->pdev->name);
+			regulator_disable(dev->gdsc);
+			return rc;
+		}
 	}
 
 	/* switch pipe clock source after gdsc is turned on */
@@ -516,9 +554,9 @@ static int ep_pcie_clk_init(struct ep_pcie_dev_t *dev)
 		if (dev->pipe_clk_mux && dev->ref_clk_src)
 			clk_set_parent(dev->pipe_clk_mux, dev->ref_clk_src);
 
-		regulator_disable(dev->gdsc);
 		if (dev->gdsc_phy)
 			regulator_disable(dev->gdsc_phy);
+		regulator_disable(dev->gdsc);
 	}
 
 	return rc;
@@ -546,9 +584,9 @@ static void ep_pcie_clk_deinit(struct ep_pcie_dev_t *dev)
 		if (dev->pipe_clk_mux && dev->ref_clk_src)
 			clk_set_parent(dev->pipe_clk_mux, dev->ref_clk_src);
 
-		regulator_disable(dev->gdsc);
 		if (dev->gdsc_phy)
 			regulator_disable(dev->gdsc_phy);
+		regulator_disable(dev->gdsc);
 	}
 }
 
@@ -1425,6 +1463,7 @@ static int ep_pcie_get_resources(struct ep_pcie_dev_t *dev,
 		if (PTR_ERR(dev->gdsc_phy) == -EPROBE_DEFER) {
 			EP_PCIE_DBG(dev, "PCIe V%d: EPROBE_DEFER for %s GDSC\n",
 			dev->rev, dev->pdev->name);
+			ret = PTR_ERR(dev->gdsc_phy);
 			goto out;
 		}
 	}
@@ -2175,6 +2214,7 @@ int ep_pcie_core_enable_endpoint(enum ep_pcie_options opt)
 			dev->rev);
 		ret = EP_PCIE_ERROR;
 		ep_pcie_reg_dump(dev, BIT(EP_PCIE_RES_PHY), false);
+		ep_pcie_clk_dump(dev);
 		goto link_fail_pipe_clk_deinit;
 	} else {
 		EP_PCIE_INFO(dev, "PCIe V%d: PCIe  PHY is ready\n", dev->rev);
@@ -3703,10 +3743,108 @@ struct ep_pcie_hw hw_drv = {
 	.get_capability = ep_pcie_core_get_cap,
 };
 
+/*
+ * is_pcie_boot_config - reads boot_config register using
+ * nvmem interface and determines if host-interface is pcie or not.
+ * @pdev: pointer to ep_pcie device.
+ *
+ * Return 0 on success, negative number on error.
+ */
+static int is_pcie_boot_config(struct platform_device *pdev)
+{
+	struct nvmem_cell *cell = NULL;
+	u32 *buf, fast_boot, host_bypass, fast_boot_mask = 0, host_bypass_mask = 0;
+	size_t len = 0;
+	int ret = 0, num_fast_boot_values = 0, i;
+	u32 fast_boot_values[MAX_FAST_BOOT_VALUES];
+
+	/*
+	 * BOOT_CONFIG is a FUSE based register.
+	 * This register allows to read the proper PBL related values.
+	 * Using nvmem interface to read boot_config register and
+	 * using bitmask (provided through devicetree) for
+	 * masking fast_boot and pcie_host_bypass.
+	 */
+	if (!of_find_property((&pdev->dev)->of_node, "nvmem-cells", NULL))
+		return 0;
+
+	ret = of_property_read_u32((&pdev->dev)->of_node, "qcom,fast-boot-mask", &fast_boot_mask);
+	if (ret) {
+		EP_PCIE_DBG(&ep_pcie_dev, "PCIe V%d: qcom,fast-boot-mask does not exist\n",
+			ep_pcie_dev.rev);
+		return ret;
+	}
+
+	ret = of_property_read_u32((&pdev->dev)->of_node, "qcom,host-bypass-mask",
+			&host_bypass_mask);
+	if (ret) {
+		EP_PCIE_DBG(&ep_pcie_dev, "PCIe V%d: qcom,host-bypass-mask does not exist\n",
+			ep_pcie_dev.rev);
+		return ret;
+	}
+
+	if (!of_get_property((&pdev->dev)->of_node, "qcom,fast-boot-values", NULL))
+		return -EINVAL;
+
+	num_fast_boot_values = of_property_count_elems_of_size((&pdev->dev)->of_node,
+			"qcom,fast-boot-values", sizeof(u32));
+	if ((num_fast_boot_values < 0) || (num_fast_boot_values > MAX_FAST_BOOT_VALUES)) {
+		EP_PCIE_DBG(&ep_pcie_dev,
+			"PCIe V%d: qcom,fast-boot-values not valid\n", ep_pcie_dev.rev);
+		return num_fast_boot_values;
+	}
+
+	ret = of_property_read_u32_array((&pdev->dev)->of_node, "qcom,fast-boot-values",
+			fast_boot_values, num_fast_boot_values);
+	if (ret) {
+		EP_PCIE_DBG(&ep_pcie_dev,
+			"PCIe V%d: qcom,fast-boot-values not found\n", ep_pcie_dev.rev);
+		return ret;
+	}
+
+	cell = nvmem_cell_get(&pdev->dev, "boot_conf");
+	if (IS_ERR(cell)) {
+		EP_PCIE_ERR(&ep_pcie_dev, "PCIe V%d: Error in reading BOOT_CONFIG cell\n",
+			ep_pcie_dev.rev);
+		return PTR_ERR(cell);
+	}
+
+	buf = nvmem_cell_read(cell, &len);
+	if (IS_ERR(buf)) {
+		EP_PCIE_ERR(&ep_pcie_dev, "PCIe V%d: Error in reading BOOT_CONFIG\n",
+			ep_pcie_dev.rev);
+		nvmem_cell_put(cell);
+		return PTR_ERR(buf);
+	}
+
+	fast_boot = (((*buf) & fast_boot_mask) >> ((ffs(fast_boot_mask)) - 1));
+	host_bypass = ((*buf) & host_bypass_mask);
+	EP_PCIE_INFO(&ep_pcie_dev,
+		"PCIe V%d: BOOT_CONFIG val = %x, fast_boot = %x, host_bypass = %x\n",
+		ep_pcie_dev.rev, (*buf), fast_boot, host_bypass);
+	kfree(buf);
+	nvmem_cell_put(cell);
+
+	for (i = 0; i < num_fast_boot_values; i++) {
+		if (fast_boot == fast_boot_values[i] && !host_bypass)
+			return 0;
+	}
+
+	return -EPERM;
+}
+
 static int ep_pcie_probe(struct platform_device *pdev)
 {
 	int ret;
 	u32 sriov_mask = 0;
+
+	ret = is_pcie_boot_config(pdev);
+	if (ret) {
+		EP_PCIE_DBG(&ep_pcie_dev,
+			"PCIe V%d: boot_config is not PCIe\n",
+			ep_pcie_dev.rev);
+		goto res_failure;
+	}
 
 	ep_pcie_dev.link_speed = 1;
 	ret = of_property_read_u32((&pdev->dev)->of_node,

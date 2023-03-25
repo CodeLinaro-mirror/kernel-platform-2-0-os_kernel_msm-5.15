@@ -32,6 +32,10 @@
 #include "qcom_scm.h"
 #include "qtee_shmbridge_internal.h"
 
+#if IS_ENABLED(CONFIG_QCOM_SCM_ALLOC_FROM_SHM_BRIDGE)
+#include <linux/qtee_shmbridge.h>
+#endif
+
 static bool download_mode = IS_ENABLED(CONFIG_QCOM_SCM_DOWNLOAD_MODE_DEFAULT);
 module_param(download_mode, bool, 0);
 
@@ -957,11 +961,9 @@ int __qcom_scm_ethqos_configure(struct device *dev, u32 emac_base_addr,
 	};
 	struct qcom_scm_res res;
 
-	pr_err("smc ethqos configure =0x%llx 0x%x 0x%x 0x%llx, 0x%llx\n",
-		emac_base_addr, link_speed, if_mode, phys_rgmii_hsr_por, len);
-
 	ret = qcom_scm_call(__scm->dev, &desc, &res);
-	pr_err("smc ethqos configure done =0x%x\n", ret);
+	pr_info("scm ethqos configure 0x%llx 0x%x 0x%x 0x%llx, 0x%llx done =0x%x\n",
+		emac_base_addr, link_speed, if_mode, phys_rgmii_hsr_por, len, ret);
 
 	return ret;
 }
@@ -991,7 +993,7 @@ int __qcom_scm_loopback_configure(struct device *dev, u32 emac_base_addr,
 	struct qcom_scm_res res;
 
 	ret = qcom_scm_call(__scm->dev, &desc, &res);
-	pr_err("smc loopback configure =0x%x\n", ret);
+	pr_info("scm loopback configure 0x%llx done = 0x%x\n", emac_base_addr, ret);
 
 	return ret;
 }
@@ -1020,11 +1022,9 @@ int __qcom_scm_iomacro_dump(struct device *dev, u32 emac_base_addr,
 	};
 	struct qcom_scm_res res;
 
-	pr_err("smc io macro dump =0x%llx buffer = 0x%llx len = 0x%x\n",
+	pr_info("scm io macro dump 0x%llx buf = 0x%llx len = 0x%x\n",
 		emac_base_addr, buffer, len);
-
 	ret = qcom_scm_call(__scm->dev, &desc, &res);
-	pr_err("smc io macro dump  done =0x%x\n", ret);
 
 	return ret;
 }
@@ -1049,14 +1049,12 @@ int __qcom_scm_get_emac_maxspeed(struct device *dev, u32 emac_base_addr,
 	};
 	struct qcom_scm_res res;
 
-	pr_err("smc get max_speed\n");
 	ret = qcom_scm_call(__scm->dev, &desc, &res);
 	if (maxspeed)
 		*maxspeed = res.result[1];
 
-	pr_err("smc get max_speed ret=0x%x res0 = %d res1 =%d res2 = %d\n",
+	pr_info("scm get max_spd ret=0x%x res0 = %d res1 =%d res2 = %d\n",
 		ret, res.result[0], res.result[1], res.result[2]);
-
 
 	return ret;
 }
@@ -1067,6 +1065,33 @@ int qcom_scm_call_get_emac_maxspeed(u32 emac_base_addr, u32 *maxspeed)
 					emac_base_addr, maxspeed);
 }
 EXPORT_SYMBOL(qcom_scm_call_get_emac_maxspeed);
+
+
+int __qcom_scm_ipa_intr_config(struct device *dev, u32 emac_base_addr, u32 value)
+{
+	int ret;
+	struct qcom_scm_desc desc = {
+		.svc = QCOM_SCM_SVC_INFO,
+		.cmd = QCOM_SCM_IPA_INTR_CONFIG_CMD,
+		.owner = ARM_SMCCC_OWNER_SIP,
+		.args[0] = emac_base_addr,
+		.args[1] = value,
+		.arginfo = QCOM_SCM_ARGS(2),
+	};
+	struct qcom_scm_res res;
+
+	ret = qcom_scm_call(__scm->dev, &desc, &res);
+	pr_info("scm ipa intr 0x%llx config = 0x%x done = 0x%x\n", emac_base_addr, value, ret);
+
+	return ret;
+}
+
+int qcom_scm_call_ipa_intr_config(u32 emac_base_addr, u32 value)
+{
+	return __qcom_scm_ipa_intr_config(__scm ? __scm->dev : NULL,
+					emac_base_addr, value);
+}
+EXPORT_SYMBOL(qcom_scm_call_ipa_intr_config);
 
 
 int __qcom_scm_get_feat_version(struct device *dev, u64 feat_id, u64 *version)
@@ -1464,6 +1489,74 @@ int qcom_scm_assign_mem(phys_addr_t mem_addr, size_t mem_sz,
 }
 EXPORT_SYMBOL(qcom_scm_assign_mem);
 
+#if IS_ENABLED(CONFIG_QCOM_SCM_ALLOC_FROM_SHM_BRIDGE)
+static int qcom_scm_assign_mem_regions_from_shm_bridge(
+				struct qcom_scm_mem_map_info *mem_regions,
+				size_t mem_regions_sz, u32 *srcvms,
+				size_t src_sz,
+				struct qcom_scm_current_perm_info *newvms,
+				size_t newvms_sz)
+{
+	int ret;
+	size_t alloc_len = 0;
+	struct qtee_shm shm_mem_regions = {0};
+	struct qtee_shm shm_srcvms = {0};
+	struct qtee_shm shm_newvms = {0};
+	bool use_qtee_shmbridge = qtee_shmbridge_is_enabled();
+
+	if (use_qtee_shmbridge) {
+		/* allocate mem_regions from shmbridge */
+		alloc_len = mem_regions_sz;
+		ret = qtee_shmbridge_allocate_shm(alloc_len, &shm_mem_regions);
+		if (ret)
+			goto exit;
+		memcpy(shm_mem_regions.vaddr, mem_regions, mem_regions_sz);
+		qtee_shmbridge_flush_shm_buf(&shm_mem_regions);
+
+		/* allocate srcvms from shmbridge */
+		alloc_len = src_sz;
+		ret = qtee_shmbridge_allocate_shm(alloc_len, &shm_srcvms);
+		if (ret)
+			goto free_mem_regions;
+		memcpy(shm_srcvms.vaddr, srcvms, src_sz);
+		qtee_shmbridge_flush_shm_buf(&shm_srcvms);
+
+		/* allocate newvms from shmbridge */
+		alloc_len = newvms_sz;
+		ret = qtee_shmbridge_allocate_shm(alloc_len, &shm_newvms);
+		if (ret)
+			goto free_srcvms;
+		memcpy(shm_newvms.vaddr, newvms, newvms_sz);
+		qtee_shmbridge_flush_shm_buf(&shm_newvms);
+
+		ret = __qcom_scm_assign_mem(__scm ? __scm->dev : NULL,
+					shm_mem_regions.paddr, mem_regions_sz,
+					shm_srcvms.paddr, src_sz,
+					shm_newvms.paddr, newvms_sz);
+		goto free_newvms;
+	} else {
+		ret = __qcom_scm_assign_mem(__scm ? __scm->dev : NULL,
+				     virt_to_phys(mem_regions), mem_regions_sz,
+				     virt_to_phys(srcvms), src_sz,
+				     virt_to_phys(newvms), newvms_sz);
+		goto exit;
+	}
+
+free_newvms:
+	qtee_shmbridge_inv_shm_buf(&shm_newvms);
+	qtee_shmbridge_free_shm(&shm_newvms);
+free_srcvms:
+	qtee_shmbridge_inv_shm_buf(&shm_srcvms);
+	qtee_shmbridge_free_shm(&shm_srcvms);
+free_mem_regions:
+	qtee_shmbridge_inv_shm_buf(&shm_mem_regions);
+	qtee_shmbridge_free_shm(&shm_mem_regions);
+
+exit:
+	return ret;
+}
+#endif
+
 /**
  * qcom_scm_assign_mem_regions() - Make a secure call to reassign memory
  *				   ownership of several memory regions
@@ -1484,6 +1577,7 @@ EXPORT_SYMBOL(qcom_scm_assign_mem);
  *
  * Return negative errno on failure, 0 on success.
  */
+#if !IS_ENABLED(CONFIG_QCOM_SCM_ALLOC_FROM_SHM_BRIDGE)
 int qcom_scm_assign_mem_regions(struct qcom_scm_mem_map_info *mem_regions,
 				size_t mem_regions_sz, u32 *srcvms,
 				size_t src_sz,
@@ -1491,10 +1585,21 @@ int qcom_scm_assign_mem_regions(struct qcom_scm_mem_map_info *mem_regions,
 				size_t newvms_sz)
 {
 	return __qcom_scm_assign_mem(__scm ? __scm->dev : NULL,
-				     virt_to_phys(mem_regions), mem_regions_sz,
-				     virt_to_phys(srcvms), src_sz,
-				     virt_to_phys(newvms), newvms_sz);
+					virt_to_phys(mem_regions), mem_regions_sz,
+					virt_to_phys(srcvms), src_sz,
+					virt_to_phys(newvms), newvms_sz);
 }
+#else
+int qcom_scm_assign_mem_regions(struct qcom_scm_mem_map_info *mem_regions,
+				size_t mem_regions_sz, u32 *srcvms,
+				size_t src_sz,
+				struct qcom_scm_current_perm_info *newvms,
+				size_t newvms_sz)
+{
+	return qcom_scm_assign_mem_regions_from_shm_bridge(mem_regions,
+					mem_regions_sz, srcvms, src_sz, newvms, newvms_sz);
+}
+#endif
 EXPORT_SYMBOL(qcom_scm_assign_mem_regions);
 
 /**

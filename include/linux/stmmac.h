@@ -134,6 +134,8 @@ struct stmmac_rxq_cfg {
 	u8 pkt_route;
 	bool use_prio;
 	u32 prio;
+	bool thresholdmode;
+	u32 threshold_byte;
 };
 
 struct stmmac_txq_cfg {
@@ -197,6 +199,12 @@ struct emac_emb_smmu_cb_ctx {
 	u32 va_size;
 	u32 va_end;
 	int ret;
+};
+
+enum ch_owner {
+	NOT_USED = 0,
+	USE_IN_STMMAC_SW = 1,
+	USE_IN_OFFLOADER = 2,
 };
 
 struct plat_stmmacenet_data {
@@ -287,6 +295,8 @@ struct plat_stmmacenet_data {
 	int msi_rx_base_vec;
 	int msi_tx_base_vec;
 	bool use_phy_wol;
+	enum ch_owner tx_dma_ch_owner[MTL_MAX_TX_QUEUES];
+	enum ch_owner rx_dma_ch_owner[MTL_MAX_RX_QUEUES];
 	struct emac_emb_smmu_cb_ctx stmmac_emb_smmu_ctx;
 	bool phy_intr_en_extn_stm;
 	int has_c22_mdio_probe_capability;
@@ -300,14 +310,13 @@ struct plat_stmmacenet_data {
 		int cmd);
 	void (*request_phy_wol)(void *plat);
 	int (*init_pps)(void *priv);
-	int mac2mac_rgmii_speed;
-	bool mac2mac_en;
+	int mac2mac_speed;
+	u32 mac2mac_en;
 	int mac2mac_link;
 	bool early_eth;
 	bool sph_disable;
 	void (*phy_irq_enable)(void *priv);
 	void (*phy_irq_disable)(void *priv);
 	int port_num;
-	bool force_thresh_dma_mode_q0_en;
 };
 #endif

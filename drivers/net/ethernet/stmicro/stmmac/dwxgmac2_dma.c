@@ -96,6 +96,9 @@ static void dwxgmac2_dma_axi(void __iomem *ioaddr, struct stmmac_axi *axi)
 	value |= (axi->axi_rd_osr_lmt << XGMAC_RD_OSR_LMT_SHIFT) &
 		XGMAC_RD_OSR_LMT;
 
+	if (axi->axi_kbbe)
+		value |= XGMAC_ONEKBBE;
+
 	if (!axi->axi_fb)
 		value |= XGMAC_UNDEF;
 
@@ -305,6 +308,7 @@ static void dwxgmac2_dma_start_rx(void __iomem *ioaddr, u32 chan)
 	u32 value;
 
 	value = readl(ioaddr + XGMAC_DMA_CH_RX_CONTROL(chan));
+	value &= ~XGMAC_RPF;
 	value |= XGMAC_RXST;
 	writel(value, ioaddr + XGMAC_DMA_CH_RX_CONTROL(chan));
 
@@ -318,6 +322,7 @@ static void dwxgmac2_dma_stop_rx(void __iomem *ioaddr, u32 chan)
 	u32 value;
 
 	value = readl(ioaddr + XGMAC_DMA_CH_RX_CONTROL(chan));
+	value |= XGMAC_RPF;
 	value &= ~XGMAC_RXST;
 	writel(value, ioaddr + XGMAC_DMA_CH_RX_CONTROL(chan));
 }

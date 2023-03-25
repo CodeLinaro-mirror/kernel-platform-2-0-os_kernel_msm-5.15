@@ -210,6 +210,7 @@
 #define MAX_NAME_LEN 80
 #define MAX_IATU_ENTRY_NUM 2
 #define MAX_PCIE_INSTANCES 16
+#define MAX_FAST_BOOT_VALUES 16
 
 #define EP_PCIE_LOG_PAGES 50
 #define EP_PCIE_MAX_VREG 4
@@ -513,6 +514,7 @@ extern int ep_pcie_get_debug_mask(void);
 extern void ep_pcie_phy_init(struct ep_pcie_dev_t *dev);
 extern bool ep_pcie_phy_is_ready(struct ep_pcie_dev_t *dev);
 extern void ep_pcie_reg_dump(struct ep_pcie_dev_t *dev, u32 sel, bool linkdown);
+extern void ep_pcie_clk_dump(struct ep_pcie_dev_t *dev);
 extern void ep_pcie_debugfs_init(struct ep_pcie_dev_t *ep_dev);
 extern void ep_pcie_debugfs_exit(void);
 
