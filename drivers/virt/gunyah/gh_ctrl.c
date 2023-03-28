@@ -17,7 +17,7 @@
 
 #define QC_HYP_SMCCC_CALL_UID                                                  \
 	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL, ARM_SMCCC_SMC_32,              \
-			   ARM_SMCCC_OWNER_VENDOR_HYP, 0xff01)
+			   ARM_SMCCC_OWNER_VENDOR_HYP, 0x3f01)
 #define QC_HYP_SMCCC_REVISION                                                  \
 	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL, ARM_SMCCC_SMC_32,              \
 			   ARM_SMCCC_OWNER_VENDOR_HYP, 0xff03)
