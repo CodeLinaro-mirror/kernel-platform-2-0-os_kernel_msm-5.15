@@ -723,6 +723,11 @@ static int stmmac_hwtstamp_set(struct net_device *dev, struct ifreq *ifr)
 	    config.tx_type != HWTSTAMP_TX_ON)
 		return -ERANGE;
 
+	if (config.rx_filter == HWTSTAMP_FILTER_ALL) {
+		netdev_alert(priv->dev, "Ignore HWTSTAMP_FILTER_ALL ioctl from userspace\n");
+		return -EOPNOTSUPP;
+	}
+
 	if (priv->adv_ts) {
 		switch (config.rx_filter) {
 		case HWTSTAMP_FILTER_NONE:
@@ -870,6 +875,11 @@ static int stmmac_hwtstamp_set(struct net_device *dev, struct ifreq *ifr)
 	priv->systime_flags |= STMMAC_HWTS_ACTIVE;
 
 	ret = stmmac_init_tstamp_counter(priv, priv->systime_flags);
+	if (ret)
+		return ret;
+
+	ret = stmmac_init_tstamp_counter(priv, priv->systime_flags);
+
 	if (ret)
 		return ret;
 
