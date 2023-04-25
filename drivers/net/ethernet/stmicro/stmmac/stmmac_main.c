@@ -878,11 +878,6 @@ static int stmmac_hwtstamp_set(struct net_device *dev, struct ifreq *ifr)
 	if (ret)
 		return ret;
 
-	ret = stmmac_init_tstamp_counter(priv, priv->systime_flags);
-
-	if (ret)
-		return ret;
-
 	if (priv->hwts_tx_en || priv->hwts_rx_en) {
 		priv->systime_flags |= tstamp_all | ptp_v2 |
 				       ptp_over_ethernet | ptp_over_ipv6_udp |
