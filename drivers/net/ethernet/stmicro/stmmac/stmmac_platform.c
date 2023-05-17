@@ -221,6 +221,9 @@ static int stmmac_mtl_setup(struct platform_device *pdev,
 			plat->rx_queues_cfg[queue].thresholdmode = true;
 		}
 
+		if (of_property_read_bool(q_node, "qcom,ipa_offload"))
+			plat->rx_queues_cfg[queue].skip_sw = true;
+
 		queue++;
 	}
 #if !IS_ENABLED(CONFIG_DWMAC_QCOM_ETHQOS)
@@ -285,6 +288,9 @@ static int stmmac_mtl_setup(struct platform_device *pdev,
 		} else {
 			plat->tx_queues_cfg[queue].use_prio = true;
 		}
+
+		if (of_property_read_bool(q_node, "qcom,ipa_offload"))
+			plat->tx_queues_cfg[queue].skip_sw = true;
 
 		queue++;
 	}
@@ -583,6 +589,8 @@ stmmac_probe_config_dt(struct platform_device *pdev, u8 *mac)
 	}
 
 	of_property_read_u32(np, "snps,ps-speed", &plat->mac_port_sel_speed);
+
+	plat->crc_strip_en = of_property_read_bool(np, "snps,crc_strip");
 
 	plat->axi = stmmac_axi_setup(pdev);
 
