@@ -608,7 +608,7 @@ static void taken_range_calc(uint32_t mmid_start, int mmid_range,
 		if (mmid_start == hab_driver.devp[i].id) {
 			*taken_start = mmid_start;
 			*taken_end = hab_driver.devp[i + mmid_range - 1].id;
-			pr_info("taken range %d %d\n", *taken_start, *taken_end);
+			pr_debug("taken range %d %d\n", *taken_start, *taken_end);
 		}
 	}
 }
@@ -674,7 +674,7 @@ static int virthab_probe(struct virtio_device *vdev)
 	uint32_t mmid_start = hab_driver.devp[0].id;
 
 	if (!virtio_has_feature(vdev, VIRTIO_F_VERSION_1)) {
-		pr_info("virtio has feature missing\n");
+		pr_err("virtio has feature missing\n");
 		return -ENODEV;
 	}
 	pr_info("virtio has feature %llX virtio devid %X vid %d empty %d\n",
@@ -723,7 +723,7 @@ static int virthab_probe(struct virtio_device *vdev)
 		mmid_start = 0;
 		mmid_range = 0;
 	}
-	pr_info("virtio device id %d mmid %d range %d\n",
+	pr_debug("virtio device id %d mmid %d range %d\n",
 			vdev->id.device, mmid_start, mmid_range);
 
 	if (!virthab_pchan_avail_check(vdev->id.device, mmid_start, mmid_range))
@@ -816,13 +816,11 @@ static int virthab_freeze(struct virtio_device *vdev)
 	struct virtio_hab *vh = get_vh(vdev);
 	unsigned long flags;
 
-	pr_info(">>> %s\n", __func__);
 	spin_lock_irqsave(&vh->mlock, flags);
 	vh->ready = false;
 	spin_unlock_irqrestore(&vh->mlock, flags);
 
 	vdev->config->del_vqs(vdev);
-	pr_info("<<< %s\n", __func__);
 	return 0;
 }
 
@@ -831,7 +829,6 @@ static int virthab_restore(struct virtio_device *vdev)
 	struct virtio_hab *vh = get_vh(vdev);
 	int err;
 
-	pr_info(">>> %s\n", __func__);
 	err = virthab_init_vqs(vh);
 	if (err)
 		return err;
@@ -839,7 +836,6 @@ static int virthab_restore(struct virtio_device *vdev)
 	virtio_device_ready(vdev);
 	vh->ready = true;
 	virthab_queue_inbufs(vh, 0);
-	pr_info("<<< %s\n", __func__);
 	return 0;
 }
 #endif

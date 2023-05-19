@@ -212,7 +212,7 @@ hab_msg_dequeue(struct virtual_channel *vchan, struct hab_message **msg,
 		else if (ret == -ERESTARTSYS)
 			ret = -EINTR;
 		else if (ret == 0) {
-			pr_info("timeout! vcid: %x\n", vchan->id);
+			pr_debug("timeout! vcid: %x\n", vchan->id);
 			ret = -ETIMEDOUT;
 		} else {
 			pr_debug("EAGAIN: ret = %d, flags = %x\n", ret, flags);
