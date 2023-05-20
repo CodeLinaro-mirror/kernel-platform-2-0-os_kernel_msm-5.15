@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include "hab.h"
 #include <linux/fdtable.h>
 #include <linux/dma-buf.h>
 #include "hab_grantable.h"
+
+#define VFIO_DEV_DT_NAME "vfio_"
 
 enum hab_page_list_type {
 	HAB_PAGE_LIST_IMPORT = 0x1,
