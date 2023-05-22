@@ -463,6 +463,11 @@ struct qcom_ethqos {
 	/* QMI over ethernet parameter */
 	u32 qoe_mode;
 	struct ethqos_vlan_info qoe_vlan;
+#if IS_ENABLED(CONFIG_ETHQOS_QCOM_HOSTVM)
+	s8 passthrough_en;
+#else
+	s8 cv2x_priority;
+#endif
 };
 
 struct pps_cfg {
@@ -509,6 +514,8 @@ struct mac_params {
 	unsigned long link_speed;
 };
 
+int ethqos_enable_serdes_consumers(struct qcom_ethqos *ethqos);
+int ethqos_disable_serdes_consumers(struct qcom_ethqos *ethqos);
 int ethqos_init_regulators(struct qcom_ethqos *ethqos);
 void ethqos_disable_regulators(struct qcom_ethqos *ethqos);
 int ethqos_init_gpio(struct qcom_ethqos *ethqos);

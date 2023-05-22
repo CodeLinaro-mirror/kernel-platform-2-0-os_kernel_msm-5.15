@@ -1460,6 +1460,7 @@ static int stmmac_init_phy(struct net_device *dev)
 			netdev_err(priv->dev, "no phy at addr %d\n", addr);
 			return -ENODEV;
 		}
+		priv->phydev->mac_managed_pm = true;
 		ret = phylink_connect_phy(priv->phylink, priv->phydev);
 		if (priv->plat->phy_intr_en_extn_stm) {
 			priv->phydev->irq = PHY_MAC_INTERRUPT;
@@ -1493,6 +1494,18 @@ static int stmmac_init_phy(struct net_device *dev)
 	return ret;
 }
 
+static void stmmac_get_fixed_state(struct phylink_config *config,
+				   struct phylink_link_state *state)
+{
+	struct net_device *ndev = to_net_dev(config->dev);
+	struct stmmac_priv *priv = netdev_priv(ndev);
+
+	if (!priv->plat->rx_clk_rdy)
+		state->link = 0;
+	else
+		state->link = 1;
+}
+
 static int stmmac_phy_setup(struct stmmac_priv *priv)
 {
 	struct stmmac_mdio_bus_data *mdio_bus_data = priv->plat->mdio_bus_data;
@@ -1503,6 +1516,10 @@ static int stmmac_phy_setup(struct stmmac_priv *priv)
 	priv->phylink_config.dev = &priv->dev->dev;
 	priv->phylink_config.type = PHYLINK_NETDEV;
 	priv->phylink_config.pcs_poll = true;
+
+	if (priv->plat->plat_wait_for_emac_rx_clk_en)
+		priv->phylink_config.get_fixed_state = stmmac_get_fixed_state;
+
 	if (priv->plat->mdio_bus_data)
 		priv->phylink_config.ovr_an_inband =
 			mdio_bus_data->xpcs_an_inband;
@@ -3464,6 +3481,10 @@ static void stmmac_mac_config_rx_queues_routing(struct stmmac_priv *priv)
 
 		packet = priv->plat->rx_queues_cfg[queue].pkt_route;
 		stmmac_rx_queue_routing(priv, priv->hw, packet, queue);
+
+		/* Configure Multicast and broadcast additionally if enabled */
+		if (priv->plat->rx_queues_cfg[queue].mbcast_route)
+			stmmac_rx_queue_routing(priv, priv->hw, PACKET_MCBCQ, queue);
 	}
 }
 
@@ -7941,12 +7962,18 @@ int stmmac_suspend(struct device *dev)
 		pinctrl_pm_select_sleep_state(priv->device);
 	}
 
+	if (priv->plat->plat_wait_for_emac_rx_clk_en)
+		priv->plat->rx_clk_rdy = false;
+
 	mutex_unlock(&priv->lock);
 
 	if (!priv->plat->mac2mac_en) {
 		rtnl_lock();
 		if (device_may_wakeup(priv->device) && priv->plat->pmt) {
 			phylink_suspend(priv->phylink, true);
+		} else if (priv->phydev->mac_managed_pm) {
+			if (!priv->dev->wol_enabled)
+				phylink_suspend(priv->phylink, false);
 		} else {
 			if (device_may_wakeup(priv->device))
 				phylink_speed_down(priv->phylink, false);
@@ -8045,7 +8072,7 @@ int stmmac_resume(struct device *dev)
 	} else {
 		pinctrl_pm_select_default_state(priv->device);
 		/* reset the phy so that it's ready */
-		if (priv->mii)
+		if (priv->mii && !priv->plat->pm_lite)
 			stmmac_mdio_reset(priv->mii);
 	}
 
@@ -8061,6 +8088,9 @@ int stmmac_resume(struct device *dev)
 		rtnl_lock();
 		if (device_may_wakeup(priv->device) && priv->plat->pmt) {
 			phylink_resume(priv->phylink);
+		} else if (priv->phydev->mac_managed_pm) {
+			if (!priv->dev->wol_enabled)
+				phylink_resume(priv->phylink);
 		} else {
 			phylink_resume(priv->phylink);
 			if (device_may_wakeup(priv->device))
