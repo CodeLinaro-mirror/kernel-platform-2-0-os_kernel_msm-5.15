@@ -31,12 +31,12 @@ declare -A MKDTIMGDTBS
 
 
 ################################################################################
-## Define TUI VM parameters
+## Define Auto VM parameters
 AUTOGHGVM_KERNEL_OFFSET=0x0
 AUTOGHGVM_DTB_OFFSET=0x3000000
 AUTOGHGVM_RAMDISK_OFFSET=0x3100000
 
-MKDTIMGDTBS["lemans_autoghgvm"]="lemans-autoghgvm"
+MKDTIMGDTBS["lemans_autoghgvm"]="lemans-gunyah-vm"
 
 VM_SIZE_EXT4=270000000
 DUMMY_IMG_SIZE=4096
