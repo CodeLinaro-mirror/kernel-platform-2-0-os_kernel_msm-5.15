@@ -207,10 +207,15 @@ static void virtinput_flat_cfg_abs(struct virtio_input *vi, unsigned int offset,
 	u32 mi, ma, re, fu, fl;
 
 	virtio_cread_bytes(vi->vdev, offset, &mi, sizeof(mi));
-	virtio_cread_bytes(vi->vdev, offset + sizeof(mi), &ma, sizeof(ma));
-	virtio_cread_bytes(vi->vdev, offset + sizeof(ma), &re, sizeof(re));
-	virtio_cread_bytes(vi->vdev, offset + sizeof(re), &fu, sizeof(fu));
-	virtio_cread_bytes(vi->vdev, offset + sizeof(fu), &fl, sizeof(fl));
+	offset += sizeof(mi);
+	virtio_cread_bytes(vi->vdev, offset, &ma, sizeof(ma));
+	offset += sizeof(ma);
+	virtio_cread_bytes(vi->vdev, offset, &fu, sizeof(fu));
+	offset += sizeof(fu);
+	virtio_cread_bytes(vi->vdev, offset, &fl, sizeof(fl));
+	offset += sizeof(fl);
+	virtio_cread_bytes(vi->vdev, offset, &re, sizeof(re));
+
 	input_set_abs_params(vi->idev, abs, mi, ma, fu, fl);
 	input_abs_set_res(vi->idev, abs, re);
 }
@@ -356,12 +361,12 @@ static void virtinput_get_flat_config(struct virtio_input *vi)
 	virtio_cread_bytes(vi->vdev, cell_offset, &vi->idev->id.bustype,
 			sizeof(vi->idev->id.bustype));
 	cell_offset += sizeof(vi->idev->id.bustype);
-	virtio_cread_bytes(vi->vdev, cell_offset, &vi->idev->id.vendor,
-			sizeof(vi->idev->id.vendor));
-	cell_offset += sizeof(vi->idev->id.vendor);
 	virtio_cread_bytes(vi->vdev, cell_offset, &vi->idev->id.product,
 			sizeof(vi->idev->id.product));
 	cell_offset += sizeof(vi->idev->id.product);
+	virtio_cread_bytes(vi->vdev, cell_offset, &vi->idev->id.vendor,
+			sizeof(vi->idev->id.vendor));
+	cell_offset += sizeof(vi->idev->id.vendor);
 	virtio_cread_bytes(vi->vdev, cell_offset, &vi->idev->id.version,
 			sizeof(vi->idev->id.version));
 
@@ -409,11 +414,11 @@ static void virtinput_get_flat_config(struct virtio_input *vi)
 	if (test_bit(EV_ABS, vi->idev->evbit)) {
 		index = VIRTIO_INPUT_FLAT_CFG_ABS;
 		for (abs = 0; abs < ABS_CNT; abs++) {
-			if (!test_bit(abs, vi->idev->absbit))
-				continue;
+			if (test_bit(abs, vi->idev->absbit)) {
+				cell_offset = head_size + offset[index];
+				virtinput_flat_cfg_abs(vi, cell_offset, abs);
+			}
 			index += 1;
-			cell_offset = head_size + offset[index];
-			virtinput_flat_cfg_abs(vi, cell_offset, abs);
 		}
 	}
 }
