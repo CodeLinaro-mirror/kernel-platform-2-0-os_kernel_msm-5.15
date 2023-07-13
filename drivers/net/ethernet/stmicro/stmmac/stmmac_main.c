@@ -6529,6 +6529,7 @@ static int STMMAC_handle_prv_ioctl_filter_ipv4(struct net_device *dev,
 	bool enable = false;
 	struct stmmac_priv *priv;
 	u32 read_value;
+	bool udp = false;
 
 	priv = netdev_priv(dev);
 
@@ -6580,7 +6581,10 @@ static int STMMAC_handle_prv_ioctl_filter_ipv4(struct net_device *dev,
 						      false, false, false, filter->dest_addr, NULL);
 	}
 
-	program_l4_filter(priv, &filter->l4_filter, cur_filter_num, false);
+	if (filter->l4_filter.l4_proto_number == IPPROTO_UDP)
+		udp = true;
+
+	program_l4_filter(priv, &filter->l4_filter, cur_filter_num, udp);
 
 	return ret;
 }
@@ -6594,6 +6598,7 @@ static int STMMAC_handle_prv_ioctl_filter_ipv6(struct net_device *dev,
 	int cur_filter_num;
 	struct stmmac_priv *priv;
 	u32 read_value;
+	bool udp = false;
 
 	priv = netdev_priv(dev);
 
@@ -6643,7 +6648,10 @@ static int STMMAC_handle_prv_ioctl_filter_ipv6(struct net_device *dev,
 							      filter->src_or_dest_addr);
 	}
 
-	program_l4_filter(priv, &filter->l4_filter, cur_filter_num, true);
+	if (filter->l4_filter.l4_proto_number == IPPROTO_UDP)
+		udp = true;
+
+	program_l4_filter(priv, &filter->l4_filter, cur_filter_num, udp);
 
 	return ret;
 }
