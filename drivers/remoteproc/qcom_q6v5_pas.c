@@ -46,6 +46,7 @@ static struct icc_path *scm_perf_client;
 static int scm_pas_bw_count;
 static DEFINE_MUTEX(scm_pas_bw_mutex);
 bool timeout_disabled;
+static bool mpss_dsm_mem_setup;
 
 struct adsp_data {
 	int crash_reason_smem;
@@ -59,7 +60,7 @@ struct adsp_data {
 	bool has_aggre2_clk;
 	bool auto_boot;
 	bool dma_phys_below_32b;
-	bool needs_extended_mem_setup;
+	bool needs_dsm_mem_setup;
 
 	char **active_pd_names;
 	char **proxy_pd_names;
@@ -1044,9 +1045,9 @@ out:
 	return ret;
 }
 
-static int setup_mpss_extended_mem(struct platform_device *pdev)
+static int setup_mpss_dsm_mem(struct platform_device *pdev)
 {
-	struct of_phandle_iterator it;
+	struct device_node *node;
 	struct resource res;
 	int hlosvm[1] = {VMID_HLOS};
 	int mssvm[1] = {VMID_MSS_MSA};
@@ -1055,24 +1056,27 @@ static int setup_mpss_extended_mem(struct platform_device *pdev)
 	u64 mem_size;
 	int ret;
 
-	of_for_each_phandle(&it, ret, pdev->dev.of_node, "extended-memory-regions", NULL, 0) {
-		ret = of_address_to_resource(it.node, 0, &res);
-		if (ret) {
-			dev_err(&pdev->dev, "address to resource failed for extended-memory-regions[%d]\n",
-								it.cur_count);
-			return ret;
-		}
-
-		mem_phys = res.start;
-		mem_size = resource_size(&res);
-		ret = hyp_assign_phys(mem_phys, mem_size, hlosvm, 1, mssvm, vmperm, 1);
-		if (ret) {
-			dev_err(&pdev->dev, "hyp assign for extended-memory-regions[%d] failed\n",
-				it.cur_count);
-			return ret;
-		}
+	node = of_parse_phandle(pdev->dev.of_node, "mpss_dsm_mem_reg", 0);
+	if (!node) {
+		dev_err(&pdev->dev, "mpss dsm mem region is missing\n");
+		return -EINVAL;
 	}
 
+	ret = of_address_to_resource(node, 0, &res);
+	if (ret) {
+		dev_err(&pdev->dev, "address to resource failed for mpss dsm mem\n");
+		return ret;
+	}
+
+	mem_phys = res.start;
+	mem_size = resource_size(&res);
+	ret = hyp_assign_phys(mem_phys, mem_size, hlosvm, 1, mssvm, vmperm, 1);
+	if (ret) {
+		dev_err(&pdev->dev, "hyp assign for mpss dsm mem failed\n");
+		return ret;
+	}
+
+	mpss_dsm_mem_setup = true;
 	return 0;
 }
 
@@ -1099,10 +1103,11 @@ static int adsp_probe(struct platform_device *pdev)
 	if (ret < 0 && ret != -EINVAL)
 		return ret;
 
-	if (desc->needs_extended_mem_setup && !strcmp(fw_name, "modem.mdt")) {
-		ret = setup_mpss_extended_mem(pdev);
+	if (desc->needs_dsm_mem_setup && !mpss_dsm_mem_setup &&
+			!strcmp(fw_name, "modem.mdt")) {
+		ret = setup_mpss_dsm_mem(pdev);
 		if (ret) {
-			dev_err(&pdev->dev, "failed to setup mpss extended mem\n");
+			dev_err(&pdev->dev, "failed to setup mpss dsm mem\n");
 			return -EINVAL;
 		}
 	}
@@ -1567,7 +1572,7 @@ static const struct adsp_data kalama_mpss_resource = {
 	.uses_elf64 = true,
 	.has_aggre2_clk = false,
 	.auto_boot = false,
-	.needs_extended_mem_setup = true,
+	.needs_dsm_mem_setup = true,
 	.ssr_name = "mpss",
 	.sysmon_name = "modem",
 	.qmp_name = "modem",
@@ -1604,7 +1609,6 @@ static const struct adsp_data cinder_mpss_resource = {
 	.uses_elf64 = true,
 	.has_aggre2_clk = false,
 	.auto_boot = false,
-	.needs_extended_mem_setup = true,
 	.ssr_name = "mpss",
 	.sysmon_name = "modem",
 	.qmp_name = "modem",
@@ -1635,7 +1639,7 @@ static const struct adsp_data sdxpinn_mpss_resource = {
 	.uses_elf64 = true,
 	.has_aggre2_clk = false,
 	.auto_boot = false,
-	.needs_extended_mem_setup = true,
+	.needs_dsm_mem_setup = true,
 	.ssr_name = "mpss",
 	.sysmon_name = "modem",
 	.qmp_name = "modem",
