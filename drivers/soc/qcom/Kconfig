@@ -221,6 +221,15 @@ config QCOM_OCMEM
 	  requirements. This is typically used by the GPU, camera/video, and
 	  audio components on some Snapdragon SoCs.
 
+config QCOM_PCIE_PDC
+	tristate "Qualcomm Technologies, Inc. (QTI) PCIe PDC driver"
+	depends on QCOM_CRM && (ARCH_QCOM || COMPILE_TEST)
+	help
+	  Support for enabling PCIe PDC interrupts in Qualcomm Technologies, Inc.
+	  (QTI) SoCs. PCIe PDC driver provides interfaces to configure PDC interrupt
+	  type and enable or disable them so that during system sleep can exit without
+	  involving CPU subsystem.
+
 config QCOM_PDR_HELPERS
 	tristate "Qualcomm Technologies, Inc. Protection Domain Restart(PDR) driver"
 	select QCOM_QMI_HELPERS
@@ -256,6 +265,16 @@ config MSM_BOOT_TIME_MARKER
 	  Use this to mark msm boot kpi for measurement.
 	  An instrumentation for boot time measurement.
 	  To create an entry, call "place_marker" function.
+	  At userspace, write marker name to "/sys/kernel/boot_kpi/kpi_values"
+
+config MSM_GVM_BOOT_TIME_MARKER
+	bool "Use MSM GVM boot time marker reporting in GVM"
+	depends on MSM_BOOT_STATS
+	default n
+	help
+	  Use this to mark msm boot kpi in guest VMs for measurement.
+	  An instrumentation for boot time measurement.
+	  To create an entry, call "update_marker" function.
 	  At userspace, write marker name to "/sys/kernel/boot_kpi/kpi_values"
 
 config QCOM_QMI_HELPERS
