@@ -38,6 +38,7 @@
 #include <linux/iio/sysfs.h>
 #include <linux/iio/trigger.h>
 #include <linux/iio/trigger_consumer.h>
+#include <linux/kthread.h>
 
 #ifdef CONFIG_INV_MPU_IIO_ICM20648
 #include "icm20648/dmp3Default.h"
@@ -827,6 +828,9 @@ struct inv_mpu_state {
 	u64 batch_timeout;
 	bool is_batch_timer_running;
 	struct work_struct batch_work;
+	struct kthread_worker kworker;
+	struct task_struct *kworker_task;
+	struct kthread_work hrtimer_work;
 #endif
 	struct i2c_client *client;
 	struct mpu_platform_data plat_data;

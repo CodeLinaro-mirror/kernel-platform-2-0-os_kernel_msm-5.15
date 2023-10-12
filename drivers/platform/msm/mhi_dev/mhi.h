@@ -558,9 +558,9 @@ struct mhi_dev {
 	struct mhi_addr			cmd_ctx_shadow;
 	struct mhi_dev_ch_ctx		*cmd_ctx_cache;
 	dma_addr_t			cmd_ctx_cache_dma_handle;
-	struct mhi_dev_ring		*ring;
+	struct mhi_dev_ring		**ring;
 	int				mhi_irq;
-	struct mhi_dev_channel		*ch;
+	struct mhi_dev_channel		**ch;
 	struct mhi_cmd_cmpl_ctx			*cmd_ctx;
 
 	int				ctrl_int;
@@ -682,6 +682,7 @@ struct mhi_dev_ctx {
 	struct ep_pcie_register_event	event_reg;
 	u32				ifc_id;
 	struct ep_pcie_hw		*phandle;
+	bool				msi_disable;
 	struct mhi_dev			*mhi_dev[MHI_MAX_NUM_INSTANCES];
 
 	/*
