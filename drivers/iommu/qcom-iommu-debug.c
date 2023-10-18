@@ -132,7 +132,7 @@ struct device *
 iommu_debug_switch_usecase(struct iommu_debug_device *ddev, u32 usecase_nr)
 {
 	struct platform_device *test_pdev;
-	struct device_node *child;
+	struct device_node *child = NULL;
 	const char *str;
 	int child_nr = 0;
 	int ret;
@@ -151,6 +151,11 @@ iommu_debug_switch_usecase(struct iommu_debug_device *ddev, u32 usecase_nr)
 		if (child_nr == usecase_nr)
 			break;
 		child_nr++;
+	}
+
+	if (!child) {
+		dev_err(ddev->self, "Invalid child\n");
+		return NULL;
 	}
 
 	test_pdev = of_platform_device_create(child, NULL, ddev->self);
