@@ -866,7 +866,7 @@ static int qti_can_do_spi_transaction(struct qti_can *priv_data)
 	struct spi_transfer *xfer;
 	struct spi_message *msg;
 	struct device *dev;
-	int ret;
+	int ret = -1;
 	int i = 0;
 	u8 tx_checksum = 0;
 	int checksum_tx_len = 0;
@@ -2041,7 +2041,7 @@ static void qti_can_shutdown(struct spi_device *spi)
 static int qti_can_add_filter(struct device *dev, struct can_filter_req *filter_request)
 {
 	char *tx_buf, *rx_buf;
-	int ret;
+	int ret = -1;
 	struct spi_mosi *req;
 	struct can_filter_req *add_filter;
 
@@ -2051,26 +2051,28 @@ static int qti_can_add_filter(struct device *dev, struct can_filter_req *filter_
 	if (spi)
 		priv_data = spi_get_drvdata(spi);
 
-	mutex_lock(&priv_data->spi_lock);
-	tx_buf = priv_data->tx_buf;
-	rx_buf = priv_data->rx_buf;
-	memset(tx_buf, 0, XFER_BUFFER_SIZE);
-	memset(rx_buf, 0, XFER_BUFFER_SIZE);
-	priv_data->xfer_length = XFER_BUFFER_SIZE;
+	if (priv_data) {
+		mutex_lock(&priv_data->spi_lock);
+		tx_buf = priv_data->tx_buf;
+		rx_buf = priv_data->rx_buf;
+		memset(tx_buf, 0, XFER_BUFFER_SIZE);
+		memset(rx_buf, 0, XFER_BUFFER_SIZE);
+		priv_data->xfer_length = XFER_BUFFER_SIZE;
 
-	req = (struct spi_mosi *)tx_buf;
+		req = (struct spi_mosi *)tx_buf;
 
-	req->len = sizeof(struct can_filter_req);
-	req->seq = atomic_inc_return(&priv_data->msg_seq);
+		req->len = sizeof(struct can_filter_req);
+		req->seq = atomic_inc_return(&priv_data->msg_seq);
 
-	add_filter = (struct can_filter_req *)req->data;
-	add_filter->can_if = filter_request->can_if;
-	add_filter->mid = filter_request->mid;
-	add_filter->mask = filter_request->mask;
+		add_filter = (struct can_filter_req *)req->data;
+		add_filter->can_if = filter_request->can_if;
+		add_filter->mid = filter_request->mid;
+		add_filter->mask = filter_request->mask;
 
-	ret = qti_can_do_spi_transaction(priv_data);
+		ret = qti_can_do_spi_transaction(priv_data);
 
-	mutex_unlock(&priv_data->spi_lock);
+		mutex_unlock(&priv_data->spi_lock);
+	}
 	return ret;
 }
 
@@ -2110,19 +2112,23 @@ static int qti_can_restore(struct device *dev)
 		ret = -1;
 	}
 
-	priv_data->probe_query_resp = false;
-	while ((query_err != 0) && (retry < QTI_CAN_FW_QUERY_RETRY_COUNT) &&
-	       (!(priv_data->probe_query_resp))) {
-		dev_dbg(dev, "Trying to query fw version %d\n", retry);
-		query_err = qti_can_query_firmware_version(priv_data);
-		priv_data->assembly_buffer_size = 0;
-		retry++;
-	}
-	dev_info(dev, "Retry count for fw version query is %d\n", retry);
-	if (query_err) {
+	if (priv_data) {
+		priv_data->probe_query_resp = false;
+
+		while ((query_err != 0) && (retry < QTI_CAN_FW_QUERY_RETRY_COUNT) &&
+		       (!(priv_data->probe_query_resp))) {
+			dev_dbg(dev, "Trying to query fw version %d\n", retry);
+			query_err = qti_can_query_firmware_version(priv_data);
+			priv_data->assembly_buffer_size = 0;
+			retry++;
+		}
+		dev_info(dev, "Retry count for fw version query is %d\n", retry);
+		if (query_err) {
 		dev_err(&priv_data->spidev->dev, "QTI CAN probe failed\n");
 		err = -ENODEV;
 		goto free_irq;
+		}
+
 	}
 
 	if (priv_data->univ_acc_filter_flag) {
