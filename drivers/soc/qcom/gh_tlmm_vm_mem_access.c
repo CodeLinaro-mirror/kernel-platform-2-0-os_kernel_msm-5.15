@@ -103,14 +103,14 @@ static struct gh_sgl_desc *gh_tlmm_vm_get_sgl(struct gh_tlmm_mem_info
 /*This API is used both for sharing and lending GPIO's*/
 static int gh_tlmm_vm_mem_share(struct gh_tlmm_vm_info *gh_tlmm_vm_info_data)
 {
-	struct gh_acl_desc *acl_desc = NULL;
-	struct gh_sgl_desc *sgl_desc = NULL;
-	struct gh_acl_desc *lend_acl_desc = NULL;
-	struct gh_sgl_desc *lend_sgl_desc = NULL;
+	struct gh_acl_desc *acl_desc;
+	struct gh_sgl_desc *sgl_desc;
+	struct gh_acl_desc *lend_acl_desc;
+	struct gh_sgl_desc *lend_sgl_desc;
 	gh_memparcel_handle_t mem_handle;
 	struct gh_tlmm_mem_info mem_info;
 	int num_regs = 0;
-	int rc = -EINVAL;
+	int rc = 0;
 
 	num_regs = gh_tlmm_vm_info_data->mem_info[SHARED_GPIO].num_regs[SHARED_GPIO];
 	if (num_regs > 0) {
@@ -136,10 +136,6 @@ static int gh_tlmm_vm_mem_share(struct gh_tlmm_vm_info *gh_tlmm_vm_info_data)
 		}
 
 		gh_tlmm_vm_info_data->mem_info[SHARED_GPIO].vm_mem_handle = mem_handle;
-	}
-	else {
-		dev_err(gh_tlmm_dev, "Failed to get number of shared regs\n");
-		return rc;
 	}
 
 	num_regs = gh_tlmm_vm_info_data->mem_info[LEND_GPIO].num_regs[LEND_GPIO];
@@ -169,10 +165,6 @@ static int gh_tlmm_vm_mem_share(struct gh_tlmm_vm_info *gh_tlmm_vm_info_data)
 		}
 
 		gh_tlmm_vm_info_data->mem_info[LEND_GPIO].vm_mem_handle = mem_handle;
-	}
-	else {
-		dev_err(gh_tlmm_dev, "Failed to get number of lend regs\n");
-		goto free_sgl_desc;
 	}
 
 free_lend_sgl_desc:
