@@ -322,10 +322,6 @@ static int stmmac_ethtool_get_link_ksettings(struct net_device *dev,
 					     struct ethtool_link_ksettings *cmd)
 {
 	struct stmmac_priv *priv = netdev_priv(dev);
-	struct phy_device *phy = dev->phydev;
-
-	if (!phy)
-		return -ENODEV;
 
 	if (!netif_running(dev))
 		return -EBUSY;
@@ -460,7 +456,10 @@ stmmac_ethtool_set_link_ksettings(struct net_device *dev,
 
 	if (!priv->plat->mac2mac_en) {
 		rc = phylink_ethtool_ksettings_set(priv->phylink, cmd);
-		linkmode_copy(priv->adv_old, phy->advertising);
+
+		if (phy)
+			linkmode_copy(priv->adv_old, phy->advertising);
+
 		return rc;
 	} else {
 		return 0;
@@ -571,14 +570,13 @@ stmmac_get_pauseparam(struct net_device *netdev,
 		if (!adv_lp.pause)
 			return;
 	} else {
-		if (!priv->plat->mac2mac_en) {
+		if (!priv->plat->mac2mac_en)
 			phylink_ethtool_get_pauseparam(priv->phylink, pause);
-		} else {
-			if (priv->flow_ctrl & FLOW_RX)
-				pause->rx_pause = 1;
-			if (priv->flow_ctrl & FLOW_TX)
-				pause->tx_pause = 1;
-		}
+
+		if (priv->flow_ctrl & FLOW_RX)
+			pause->rx_pause = 1;
+		if (priv->flow_ctrl & FLOW_TX)
+			pause->tx_pause = 1;
 	}
 }
 
@@ -808,12 +806,6 @@ static void stmmac_get_strings(struct net_device *dev, u32 stringset, u8 *data)
 static void stmmac_get_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
 {
 	struct stmmac_priv *priv = netdev_priv(dev);
-
-	if (!priv->phydev) {
-		pr_err("%s: %s: PHY is not registered\n",
-		       __func__, dev->name);
-		return;
-	}
 
 	if (!priv->plat->pmt)
 		return phylink_ethtool_get_wol(priv->phylink, wol);

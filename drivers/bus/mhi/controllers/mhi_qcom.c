@@ -275,9 +275,9 @@ static const struct mhi_channel_config modem_qcom_sa525m_mhi_channels[] = {
 	MHI_CHANNEL_CONFIG_DL(21, "IPCR", 32, 2, MHI_EE_AMSS,
 			      MHI_DB_BRST_DISABLE, false, 0, false, false,
 			      false, true, 0, 0),
-	MHI_CHANNEL_CONFIG_UL(46, "IP_SW1", 512, 4, MHI_EE_AMSS,
+	MHI_CHANNEL_CONFIG_UL(46, "IP_SW1", 1024, 4, MHI_EE_AMSS,
 			      MHI_DB_BRST_DISABLE, false, 0, false, false, 0),
-	MHI_CHANNEL_CONFIG_DL(47, "IP_SW1", 512, 5, MHI_EE_AMSS,
+	MHI_CHANNEL_CONFIG_DL(47, "IP_SW1", 1024, 5, MHI_EE_AMSS,
 			      MHI_DB_BRST_DISABLE, false, 0, false, false,
 			      false, false, 0, 0),
 };
@@ -295,10 +295,10 @@ static struct mhi_event_config modem_qcom_sa525m_mhi_events[] = {
 	MHI_EVENT_CONFIG(3, 4, MHI_ER_DATA, 256, 0,
 			MHI_ER_PRIORITY_DEFAULT_NOSLEEP, MHI_DB_BRST_DISABLE,
 			false, false, false, 0),
-	MHI_EVENT_CONFIG(4, 5, MHI_ER_DATA, 1024, 5,
+	MHI_EVENT_CONFIG(4, 5, MHI_ER_DATA, 1024, 0,
 			MHI_ER_PRIORITY_HI_NOSLEEP, MHI_DB_BRST_DISABLE,
 			false, false, false, 46),
-	MHI_EVENT_CONFIG(5, 6, MHI_ER_DATA, 1024, 5,
+	MHI_EVENT_CONFIG(5, 6, MHI_ER_DATA, 1024, 0,
 			MHI_ER_PRIORITY_HI_NOSLEEP, MHI_DB_BRST_DISABLE,
 			false, false, false, 47),
 };
@@ -1263,7 +1263,7 @@ static int mhi_qcom_register_controller(struct mhi_controller *mhi_cntrl,
 		     PCI_SLOT(pci_dev->devfn));
 	mhi_dev->name = dev_name(&mhi_dev->dev);
 
-	mhi_priv->cntrl_ipc_log = ipc_log_context_create(MHI_IPC_LOG_PAGES,
+	mhi_priv->cntrl_ipc_log = ipc_log_context_create(CONFIG_MHI_BUS_LOG_PAGES,
 							 dev_info->name, 0);
 
 	return 0;
