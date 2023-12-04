@@ -5023,6 +5023,8 @@ static int fastrpc_mmap_remove_ssr(struct fastrpc_file *fl, int locked)
 						fastrpc_mmap_add(match);
 					}
 				}
+				if (err)
+					goto bail;
 			}
 			memset(&ramdump_segments_rh, 0, sizeof(ramdump_segments_rh));
 			ramdump_segments_rh.da = match->phys;
