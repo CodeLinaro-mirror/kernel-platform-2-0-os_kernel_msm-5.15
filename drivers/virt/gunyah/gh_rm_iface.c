@@ -1554,7 +1554,7 @@ int gh_rm_vm_set_crash_msg(const char *buf, size_t size)
 	req_payload->msg_size = size;
 	memcpy(req_payload->data, buf, size);
 
-	resp = gh_rm_call(GH_RM_RPC_MSG_ID_CALL_VM_SET_CRASH_MSG,
+	resp = gh_rm_call_noblock(GH_RM_RPC_MSG_ID_CALL_VM_SET_CRASH_MSG,
 				  req_payload, req_payload_size,
 				  &resp_payload_size, &reply_err_code);
 	kfree(req_payload);

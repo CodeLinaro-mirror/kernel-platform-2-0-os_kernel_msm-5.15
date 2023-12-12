@@ -311,7 +311,7 @@ struct gh_vm_status {
 } __packed;
 
 /* VM Crash Msg */
-#define GH_RM_CRASH_MSG_MAX_SIZE	1024
+#define GH_RM_CRASH_MSG_MAX_SIZE	192
 #define GH_RM_CRASH_MSG_ALIGN_SIZE	4
 
 struct gh_vm_crash_msg {
