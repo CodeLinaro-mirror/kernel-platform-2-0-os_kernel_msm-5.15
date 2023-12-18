@@ -22,19 +22,20 @@
 #include <linux/gunyah/gh_vm.h>
 #include <soc/qcom/secure_buffer.h>
 
-
-char crash_msg[4096] = "VM crashed\n";
+char buf[GH_RM_CRASH_MSG_MAX_SIZE] = "\0";
 
 static int gh_panic_notifier_notify(struct notifier_block *this,
 			  unsigned long event, void *ptr)
 {
 	int ret;
+	size_t len;
+	struct kmsg_dump_iter iter;
 
-	pr_debug("generic gh notifier\n");
-	ret = gh_rm_vm_set_crash_msg(crash_msg, sizeof(crash_msg));
-	pr_debug("%d from crash msg\n", ret);
-	mdelay(50);
-	return 0;
+	kmsg_dump_rewind(&iter);
+	kmsg_dump_get_buffer(&iter, false, buf, sizeof(buf)-1, &len);
+	buf[len-1] = '\0';
+	ret = gh_rm_vm_set_crash_msg(buf, len);
+	return ret;
 }
 
 
