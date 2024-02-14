@@ -2807,12 +2807,21 @@ static irqreturn_t ep_pcie_handle_dstate_change_irq(int irq, void *data)
 			dev->rev, dev->d3_counter);
 		ep_pcie_write_mask(dev->parf + PCIE20_PARF_PM_CTRL, 0, BIT(1));
 
-		if (dev->enumerated)
+		if (dev->enumerated) {
 			ep_pcie_notify_event(dev, EP_PCIE_EVENT_PM_D3_HOT);
-		else
+			if (dev->configure_hard_reset) {
+#if IS_ENABLED(CONFIG_QCOM_SCM)
+				qcom_scm_set_d3w_mode();
+#endif
+				EP_PCIE_ERR(dev,
+					"PCIe V%d: Configuring SOC to hard reset, during D3cold\n",
+					dev->rev);
+			}
+		} else {
 			EP_PCIE_DBG(dev,
 				"PCIe V%d: do not notify client about this D3 hot event since enumeration by HLOS is not done yet\n",
 				dev->rev);
+		}
 		if (atomic_read(&dev->host_wake_pending))
 			ep_pcie_core_wakeup_host_internal(
 				EP_PCIE_EVENT_PM_D3_HOT);
@@ -3730,14 +3739,15 @@ int ep_pcie_core_get_msi_config(struct ep_pcie_msi_config *cfg, u32 vf_id)
 				msi_cfg->data = data;
 				ep_pcie_dev.conf_ipa_msi_iatu[vf_id] = false;
 			}
-			/*
-			 * All transactions originating from IPA have the RO
-			 * bit set by default. Setup another ATU region to clear
-			 * the RO bit for MSIs triggered via IPA DMA.
-			 */
-			if (ep_pcie_dev.no_path_from_ipa_to_pcie ||
-				(ep_pcie_dev.active_config &&
-				!ep_pcie_dev.conf_ipa_msi_iatu[vf_id])) {
+		}
+		/*
+		 * All transactions originating from IPA have the RO
+		 * bit set by default. Setup another ATU region to clear
+		 * the RO bit for MSIs triggered via IPA DMA.
+		 */
+		if (ep_pcie_dev.no_path_from_ipa_to_pcie ||
+			(ep_pcie_dev.active_config &&
+			!ep_pcie_dev.conf_ipa_msi_iatu[vf_id])) {
 				ep_pcie_config_outbound_iatu_entry(&ep_pcie_dev,
 					EP_PCIE_OATU_INDEX_IPA_MSI,
 					vf_id,
@@ -3748,7 +3758,6 @@ int ep_pcie_core_get_msi_config(struct ep_pcie_msi_config *cfg, u32 vf_id)
 				EP_PCIE_DBG(&ep_pcie_dev,
 					"PCIe V%d: Conf iATU for IPA MSI info: lower:0x%x; upper:0x%x\n",
 					ep_pcie_dev.rev, lower, upper);
-			}
 		}
 		return 0;
 	}
@@ -4530,6 +4539,12 @@ static int ep_pcie_probe(struct platform_device *pdev)
 				&ep_pcie_dev.pcie_cesta_clkreq_offset);
 	if (ret)
 		ep_pcie_dev.pcie_cesta_clkreq_offset = 0;
+
+	ep_pcie_dev.configure_hard_reset = of_property_read_bool((&pdev->dev)->of_node,
+					"qcom,pcie-configure-hard-reset");
+	EP_PCIE_DBG(&ep_pcie_dev,
+		"PCIe V%d: pcie configure hard reset is %s enabled\n",
+		ep_pcie_dev.rev, ep_pcie_dev.configure_hard_reset ? "" : "not");
 
 	memcpy(ep_pcie_dev.vreg, ep_pcie_vreg_info,
 				sizeof(ep_pcie_vreg_info));
