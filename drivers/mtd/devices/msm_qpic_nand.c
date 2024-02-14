@@ -1217,8 +1217,8 @@ static int msm_nand_validate_mtd_params(struct mtd_info *mtd, bool read,
 			goto out;
 		} else if ((ops->len % (mtd->writesize +
 				mtd->oobsize)) != 0) {
-			pr_err("unsupported data len %d for RAW mode\n",
-				ops->len);
+			pr_err("unsupported data len, only multiples of (%d + %d) supported for RAW mode\n",
+				mtd->writesize, mtd->oobsize);
 			err = -EINVAL;
 			goto out;
 		}
@@ -3609,23 +3609,40 @@ out:
 
 /*
  * Function that gets called from upper layers such as MTD/YAFFS2 to read a
- * page with only main data.
+ * page.
  */
-static int msm_nand_read(struct mtd_info *mtd, loff_t from, size_t len,
-	      size_t *retlen, u_char *buf)
+static int msm_nand_read(struct mtd_info *mtd, loff_t from,
+			struct mtd_oob_ops *ops_mtd)
 {
-	int ret;
+	struct msm_nand_info *info = mtd->priv;
+	struct mtd_oob_ops ops;
+	size_t *retlen = &ops_mtd->retlen;
+	u_char *buf = ops_mtd->datbuf;
+	size_t len = ops_mtd->len;
+	u_char *bounce_buf = NULL;
 	int is_euclean = 0;
 	int is_ebadmsg = 0;
-	struct mtd_oob_ops ops;
-	unsigned char *bounce_buf = NULL;
-	struct msm_nand_info *info = mtd->priv;
+	int ret;
 
-	ops.mode = MTD_OPS_AUTO_OOB;
-	ops.retlen = 0;
-	ops.ooblen = 0;
-	ops.oobbuf = NULL;
+	memcpy(&ops, ops_mtd, sizeof(struct mtd_oob_ops));
 	*retlen = 0;
+
+	/*
+	 * For normal read request, ops.mode is not set in mtdcore layer,
+	 * so its value remains 0 which corrosponds to MTD_OPS_PLACE_OOB.
+	 * So, here we explicitly set it to auto mode, if its value is 0.
+	 */
+	if (ops.mode == MTD_OPS_PLACE_OOB) {
+		ops.mode = MTD_OPS_AUTO_OOB;
+
+	} else if (ops.mode == MTD_OPS_RAW) {
+		if (info->nand_chip.caps & MSM_NAND_CAP_PAGE_SCOPE_READ)
+			ret = msm_nand_read_pagescope(mtd, from, &ops);
+		else
+			ret = msm_nand_read_oob(mtd, from, &ops);
+		*retlen = ops.retlen;
+		goto out;
+	}
 
 	if (!(from & (mtd->writesize - 1)) && !(len % mtd->writesize)) {
 		/*
@@ -3932,19 +3949,34 @@ validate_mtd_params_failed:
 
 /*
  * Function that gets called from upper layers such as MTD/YAFFS2 to write a
- * page with only main data.
+ * page.
  */
-static int msm_nand_write(struct mtd_info *mtd, loff_t to, size_t len,
-			  size_t *retlen, const u_char *buf)
+static int msm_nand_write(struct mtd_info *mtd, loff_t to,
+			struct mtd_oob_ops *ops_mtd)
 {
-	int ret;
 	struct mtd_oob_ops ops;
 	unsigned char *bounce_buf = NULL;
+	const u_char *buf = ops_mtd->datbuf;
+	size_t *retlen = &ops_mtd->retlen;
+	size_t len = ops_mtd->len;
+	int ret;
 
-	ops.mode = MTD_OPS_AUTO_OOB;
-	ops.retlen = 0;
-	ops.ooblen = 0;
-	ops.oobbuf = NULL;
+	memcpy(&ops, ops_mtd, sizeof(struct mtd_oob_ops));
+	*retlen = 0;
+
+	/*
+	 * For normal write request, ops.mode is not set in mtdcore layer,
+	 * so its value remains 0 which corrosponds to MTD_OPS_PLACE_OOB.
+	 * So, here we explicitly set it to auto mode, if its value is 0.
+	 */
+	if (ops.mode == MTD_OPS_PLACE_OOB) {
+		ops.mode = MTD_OPS_AUTO_OOB;
+
+	} else if (ops.mode == MTD_OPS_RAW) {
+		ret = msm_nand_write_oob(mtd, to, &ops);
+		*retlen = ops.retlen;
+		goto out;
+	}
 
 	/* partial page writes are not supported */
 	if ((to & (mtd->writesize - 1)) || (len % mtd->writesize)) {
@@ -4625,8 +4657,8 @@ static int msm_nand_scan(struct mtd_info *mtd)
 	mtd->_erase = msm_nand_erase;
 	mtd->_block_isbad = msm_nand_block_isbad;
 	mtd->_block_markbad = msm_nand_block_markbad;
-	mtd->_read = msm_nand_read;
-	mtd->_write = msm_nand_write;
+	mtd->_read_oob  = msm_nand_read;
+	mtd->_write_oob = msm_nand_write;
 	mtd->owner = THIS_MODULE;
 out:
 	return err;
