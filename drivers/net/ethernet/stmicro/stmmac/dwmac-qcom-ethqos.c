@@ -271,6 +271,9 @@ MODULE_PARM_DESC(ermac, "mac address from ethernet partition");
 static char *eiface;
 module_param(eiface, charp, 0660);
 MODULE_PARM_DESC(eiface, "Interface type from ethernet partition");
+static char *eqos;
+module_param(eqos, charp, 0600);
+MODULE_PARM_DESC(eqos, "QOS Config support from ethernet partition");
 #endif
 
 inline void *qcom_ethqos_get_priv(struct qcom_ethqos *ethqos)
@@ -750,6 +753,19 @@ fail:
 	return 1;
 }
 
+static int set_ethernet_qos_cfg(char *qoscfg)
+{
+	if (!qoscfg)
+		return 1;
+
+	if ((strlen(qoscfg) == 0) || (strlen(qoscfg) > 4))
+		return 1;
+
+	strscpy(mparams.qoscfg_name, qoscfg, sizeof(mparams.qoscfg_name));
+
+	return 0;
+}
+
 #ifndef MODULE
 static int __init set_early_ethernet_ipv4_static(char *ipv4_addr_in)
 {
@@ -810,6 +826,19 @@ static int __init set_ethernet_speed_static(char *eth_speed)
 }
 
 __setup("espeed=", set_ethernet_speed_static);
+
+static int __init set_ethernet_qoscfg_static(char *eth_qos)
+{
+	int ret = 1;
+
+	ret = set_ethernet_qos_cfg(eth_qos);
+	if (ret)
+		mparams.qoscfg_name[0] = '\0';
+
+	return 0;
+}
+
+__setup("eqos=", set_ethernet_qoscfg_static);
 
 #endif
 
@@ -6936,6 +6965,20 @@ static void qcom_ethqos_init_aux_ts(struct qcom_ethqos *ethqos,
 	dev_info(&ethqos->pdev->dev, "ext_snapshot_num = %d\n", plat_dat->ext_snapshot_num);
 }
 
+static void ethqos_get_dt_qos_config(struct device_node *np)
+{
+	const char *qoscfg;
+	int err;
+
+	err = of_property_read_string(np, "config-qos", &qoscfg);
+	if (err < 0) {
+		mparams.qoscfg_name[0] = '\0';
+		return;
+	}
+
+	strscpy(mparams.qoscfg_name, qoscfg, sizeof(mparams.qoscfg_name));
+}
+
 static int qcom_ethqos_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
@@ -6968,6 +7011,9 @@ static int qcom_ethqos_probe(struct platform_device *pdev)
 
 	if (eiface)
 		ret = set_ethernet_interface(eiface);
+
+	if (eqos)
+		ret = set_ethernet_qos_cfg(eqos);
 #endif
 
 	ipc_stmmac_log_ctxt = ipc_log_context_create(IPCLOG_STATE_PAGES,
@@ -6999,11 +7045,32 @@ static int qcom_ethqos_probe(struct platform_device *pdev)
 			goto err_mem;
 	}
 
+	if (!(strlen(mparams.qoscfg_name) != 0))
+		ethqos_get_dt_qos_config(np);
+
 	plat_dat = stmmac_probe_config_dt(pdev, stmmac_res.mac);
 	if (IS_ERR(plat_dat)) {
 		dev_err(&pdev->dev, "dt configuration failed\n");
 		return PTR_ERR(plat_dat);
 	}
+
+	if (strlen(mparams.qoscfg_name) != 0) {
+		strscpy(plat_dat->qoscfg, mparams.qoscfg_name, sizeof(mparams.qoscfg_name));
+		ret = stmmac_mtl_setup(pdev, plat_dat);
+		if (ret) {
+			stmmac_remove_config_dt(pdev, plat_dat);
+			return ret;
+		}
+		plat_dat->rx_qos_queues_to_use = plat_dat->rx_queues_to_use;
+		plat_dat->tx_qos_queues_to_use = plat_dat->tx_queues_to_use;
+		plat_dat->qos_config = true;
+	}
+
+	ETHQOSINFO("RX QOS queues = %d, TX QOS queues = %d RX queues = %d TX queues = %d\n",
+		   plat_dat->rx_qos_queues_to_use,
+		   plat_dat->tx_qos_queues_to_use,
+		   plat_dat->rx_queues_to_use,
+		   plat_dat->tx_queues_to_use);
 
 	if (mparams.is_valid_eth_intf) {
 		plat_dat->interface = mparams.eth_intf;

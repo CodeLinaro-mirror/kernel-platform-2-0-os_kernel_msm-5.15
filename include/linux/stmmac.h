@@ -345,5 +345,10 @@ struct plat_stmmacenet_data {
 	bool mac_suspended;
 	bool separate_wol_pin;
 	bool probe_invoke_if_up;
+	int rx_qos_queues_to_use;
+	int tx_qos_queues_to_use;
+	bool is_config_supp;
+	char qoscfg[4];
+	bool qos_config;
 };
 #endif
