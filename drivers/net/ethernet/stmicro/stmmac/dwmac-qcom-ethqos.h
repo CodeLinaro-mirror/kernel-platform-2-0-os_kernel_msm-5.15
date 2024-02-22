@@ -115,6 +115,10 @@ do {\
 
 #define ETHQOS_CONFIG_PPSOUT_CMD 44
 #define ETHQOS_AVB_ALGORITHM 27
+#define ETHQOS_THERM_GET_REM_RESP	(ETHQOS_AVB_ALGORITHM + 1)
+#define ETHQOS_THERM_SET_LOCAL_ETH_CAP	(ETHQOS_THERM_GET_REM_RESP + 1)
+#define ETHQOS_THERM_GET_REM_CAP	(ETHQOS_THERM_SET_LOCAL_ETH_CAP + 1)
+#define ETHQOS_THERM_SET_LOCAL_ETH_MODE	(ETHQOS_THERM_GET_REM_CAP + 1)
 
 #define PPS_MAXIDX(x)			((((x) + 1) * 8) - 1)
 #define PPS_MINIDX(x)			((x) * 8)
@@ -211,6 +215,46 @@ do {\
 #endif
 
 #define MAC_REG_SIZE 4
+
+enum EthMode {
+	UNKNOWN         = 0,            /** Unknown */
+	USXGMII_10G     = (1 << 0),     /** USXGMII 10G data rate */
+	USXGMII_5G      = (1 << 1),     /** USXGMII 5G data rate */
+	USXGMII_2_5G    = (1 << 2),     /** USXGMII 2.5G data rate */
+	USXGMII_1G      = (1 << 3),     /** USXGMII 1G data rate */
+	USXGMII_100M    = (1 << 4),     /** USXGMII 100M data rate */
+	USXGMII_10M     = (1 << 5),     /** USXGMII 10M data rate */
+	SGMII_2_5G      = (1 << 6),     /** SGMII 2.5G data rate */
+	SGMII_1G        = (1 << 7),     /** SGMII 1G data rate */
+	SGMII_100M      = (1 << 8)      /** SGMII 100M data rate */
+};
+
+enum LinkModeChangeStatus {
+	ACCEPTED        = 1,        /** Request accepted to update link mode */
+	COMPLETED       = 2,        /** Successfully completed link mode update */
+	FAILED          = 3,        /** Request failed to update link mode */
+	REJECTED        = 4,         /** Request rejected to update link mode */
+	TIME_OUT	= 5
+};
+
+enum PhyMode {
+	ETHQOS_PHY_STATE_UP,
+	ETHQOS_PHY_STATE_DOWN
+};
+
+enum NlmsgFlags {
+	SUCCESS,
+	FAIL,
+	TIMEOUT,
+	INVALID_SPEED
+};
+
+enum NlmsgType {
+	THERM_SET_LOCAL_ETH_CAP		= 1,
+	THERM_NEW_LOCAL_ETH_MODE	= 2,
+	THERM_NEW_LOCAL_ETH_MODE_UPDATE = 3,
+	THERM_NEW_PEER_ETH_MODE		= 4
+};
 
 static inline u32 PPSCMDX(u32 x, u32 val)
 {
@@ -421,6 +465,9 @@ struct qcom_ethqos {
 	/* Work struct for handling phy interrupt */
 	struct work_struct emac_wol_work;
 
+	/* Work struct for handling phy state */
+	struct work_struct emac_phy_state_work;
+
 	struct ethqos_emac_por *por;
 	unsigned int num_por;
 	unsigned int emac_ver;
@@ -527,6 +574,15 @@ struct qcom_ethqos {
 	struct mac_csr_data *mac_reg_list;
 	bool power_state;
 	bool gdsc_off_on_suspend;
+
+	enum LinkModeChangeStatus peer_resp;
+	struct completion thermal_timer;
+	struct hrtimer hr_timer;
+	enum PhyMode curr_phy_state;
+	struct sock *socket_nl;
+	struct nlmsghdr *nlh;
+	enum EthMode peer_cap;
+	enum EthMode current_mode;
 };
 
 struct pps_cfg {
@@ -572,7 +628,8 @@ struct mac_params {
 	bool is_valid_eth_intf;
 	unsigned int link_speed;
 };
-
+int qcom_ethqos_bring_down_phy_if(struct device *dev);
+int qcom_ethqos_bring_up_phy_if(struct device *dev, bool client_mode);
 int ethqos_init_sgmii_regulators(struct qcom_ethqos *ethqos);
 int ethqos_enable_serdes_consumers(struct qcom_ethqos *ethqos);
 int ethqos_disable_serdes_consumers(struct qcom_ethqos *ethqos);
