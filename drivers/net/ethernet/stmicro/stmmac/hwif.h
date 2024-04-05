@@ -392,6 +392,9 @@ struct stmmac_ops {
 	int (*add_hw_vlan_rx_fltr)(struct net_device *dev,
 				   struct mac_device_info *hw,
 				   __be16 proto, u16 vid);
+	int (*add_hw_vlan_rx_fltr_with_route)(struct net_device *dev,
+					      struct mac_device_info *hw,
+					      u16 vid, u16 dma_ch);
 	int (*del_hw_vlan_rx_fltr)(struct net_device *dev,
 				   struct mac_device_info *hw,
 				   __be16 proto, u16 vid);
