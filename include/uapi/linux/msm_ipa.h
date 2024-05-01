@@ -546,22 +546,34 @@ enum ipa_client_type {
 	IPA_CLIENT_IPSEC_APPS_WAN_CONS		= 135,
 
 	IPA_CLIENT_APPS_WAN_ETH_PROD            = 136,
-	/* RESERVED CONS			            = 137, */
+	/* RESERVED CONS			= 137, */
 
-	IPA_CLIENT_APPS_WAN_V2X_PROD			= 138,
-	IPA_CLIENT_APPS_WAN_V2X_CONS			= 139,
+	IPA_CLIENT_APPS_WAN_V2X_PROD		= 138,
+	IPA_CLIENT_APPS_WAN_V2X_CONS		= 139,
 
 	IPA_CLIENT_Q6_V2X_BROADCAST_PROD        = 140,
-	/* RESERVED CONS			            = 141, */
+	/* RESERVED CONS			= 141, */
 
 	IPA_CLIENT_Q6_V2X_UNICAST_PROD          = 142,
-	/* RESERVED CONS			            = 143, */
+	/* RESERVED CONS			= 143, */
 
-	/* RESERVED PROD			            = 144, */
-	IPA_CLIENT_Q6_CV2X_DECIPHER_CONS		= 145,
+	/* RESERVED PROD			= 144, */
+	IPA_CLIENT_Q6_CV2X_DECIPHER_CONS	= 145,
+
+	IPA_CLIENT_ETHERNET_PROD1		= 146,
+	IPA_CLIENT_ETHERNET_CONS1		= 147,
+
+	IPA_CLIENT_ETHERNET_PROD2		= 148,
+	IPA_CLIENT_ETHERNET_CONS2		= 149,
+
+	IPA_CLIENT_ETHERNET_PROD3		= 150,
+	IPA_CLIENT_ETHERNET_CONS3		= 151,
+
+	IPA_CLIENT_ETHERNET_PROD4		= 152,
+	IPA_CLIENT_ETHERNET_CONS4		= 153
 };
 
-#define IPA_CLIENT_MAX (IPA_CLIENT_Q6_CV2X_DECIPHER_CONS + 1)
+#define IPA_CLIENT_MAX (IPA_CLIENT_ETHERNET_CONS4 + 1)
 
 #define IPA_CLIENT_WLAN2_PROD IPA_CLIENT_A5_WLAN_AMPDU_PROD
 #define IPA_CLIENT_Q6_DL_NLO_DATA_PROD IPA_CLIENT_Q6_DL_NLO_DATA_PROD
@@ -600,6 +612,7 @@ enum ipa_client_type {
 #define IPA_CLIENT_IPSEC_DECAP_NON_RECOVERABLE_ERR_CONS \
 	IPA_CLIENT_IPSEC_DECAP_NON_RECOVERABLE_ERR_CONS
 #define IPA_CLIENT_IPSEC_ENCAP_ERR_CONS IPA_CLIENT_IPSEC_ENCAP_ERR_CONS
+#define IPA_CLIENT_ETHERNET_CONS4 IPA_CLIENT_ETHERNET_CONS4
 
 #define IPA_CLIENT_IS_APPS_CONS(client) \
 	((client) == IPA_CLIENT_APPS_LAN_CONS || \
@@ -788,7 +801,8 @@ enum ipa_ip_type {
 	IPA_IP_MAX = 2,
 	IPA_IP_v4_VLAN = IPA_IP_MAX,
 	IPA_IP_v6_VLAN,
-	IPA_IP_MAX_WLAN
+	IPA_IP_MAX_WLAN,
+	IPA_IP_VLAN_MAX = IPA_IP_MAX_WLAN
 };
 
 #define VALID_IPA_IP_TYPE(t) \
@@ -2275,12 +2289,14 @@ struct ipa_rt_rule_add_ext {
  *  specifies rule_id as 0 the driver will assign a new rule_id
  *		0 for success,
  *		-1 for failure
+ * @sticky_front: add the rule to front of routing table and make it sticky.
  */
 struct ipa_rt_rule_add_ext_v2 {
 	uint8_t at_rear;
 	uint32_t rt_rule_hdl;
 	int status;
 	uint16_t rule_id;
+	uint8_t sticky_front;
 	struct ipa_rt_rule_v2 rule;
 };
 
@@ -2631,6 +2647,7 @@ struct ipa_ioc_query_intf {
  * @alt_dst_pipe: alternate routing output pipe
  * @hdr_name: name of associated header if any, empty string when no header
  * @hdr_l2_type: type of associated header if any, use NONE when no header
+ * @tc_bmap: Bit map indicating the traffic classes associated to the pipe
  */
 struct ipa_ioc_tx_intf_prop {
 	enum ipa_ip_type ip;
@@ -2639,6 +2656,7 @@ struct ipa_ioc_tx_intf_prop {
 	enum ipa_client_type alt_dst_pipe;
 	char hdr_name[IPA_RESOURCE_NAME_MAX];
 	enum ipa_hdr_l2_type hdr_l2_type;
+	uint32_t tc_bmap;
 };
 
 /**
@@ -2695,12 +2713,14 @@ struct ipa_ioc_query_intf_ext_props {
  * @attrib: filtering rule
  * @src_pipe: input pipe
  * @hdr_l2_type: type of associated header if any, use NONE when no header
+ * @tc_bmap: Bit map indicating the traffic classes associated to the pipe
  */
 struct ipa_ioc_rx_intf_prop {
 	enum ipa_ip_type ip;
 	struct ipa_rule_attrib attrib;
 	enum ipa_client_type src_pipe;
 	enum ipa_hdr_l2_type hdr_l2_type;
+	uint32_t tc_bmap;
 };
 
 /**
