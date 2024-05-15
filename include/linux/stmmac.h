@@ -324,6 +324,7 @@ struct plat_stmmacenet_data {
 	int mac2mac_speed;
 	u32 mac2mac_en;
 	int mac2mac_link;
+	u32 plat_wait_for_emac_rx_clk_en;
 	bool early_eth;
 	bool sph_disable;
 	void (*phy_irq_enable)(void *priv);
@@ -336,7 +337,6 @@ struct plat_stmmacenet_data {
 	bool fixed_phy_mode;
 	bool fixed_phy_mode_needs_mdio;
 	bool crc_strip_en;
-	bool plat_wait_for_emac_rx_clk_en;
 	bool rx_clk_rdy;
 	bool mac_err_rec;
 	bool mdio_op_busy;

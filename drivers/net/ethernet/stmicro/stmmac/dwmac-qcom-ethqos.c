@@ -3353,15 +3353,20 @@ static ssize_t write_ethqos_rx_clock(struct device *dev,
 	if (kstrtos8(user_buffer, 0, &input))
 		return -EFAULT;
 
-	if (input != 1) {
+	if (input != 0 && input != 1) {
 		ETHQOSERR("invalid input\n");
 		return -EINVAL;
 	}
 
-	if (!plat->rx_clk_rdy) {
+	if (input && !plat->rx_clk_rdy) {
 		plat->rx_clk_rdy = true;
 		rtnl_lock();
 		phylink_resume(priv->phylink);
+		rtnl_unlock();
+	} else if (!input && plat->rx_clk_rdy) {
+		plat->rx_clk_rdy = false;
+		rtnl_lock();
+		phylink_stop(priv->phylink);
 		rtnl_unlock();
 	}
 
@@ -6261,8 +6266,9 @@ static int ethqos_fixed_link_check(struct platform_device *pdev)
 	int mac2mac_speed;
 	int ret = 0;
 	static u32 speed;
+	struct device_node *np = pdev->dev.of_node;
 
-	fixed_phy_node = of_get_child_by_name(pdev->dev.of_node, "fixed-link");
+	fixed_phy_node = of_get_child_by_name(np, "fixed-link");
 	if (of_device_is_available(fixed_phy_node)) {
 		of_property_read_u32(fixed_phy_node, "speed", &mac2mac_speed);
 		plat_dat->fixed_phy_mode = true;
@@ -6330,9 +6336,12 @@ static int ethqos_fixed_link_check(struct platform_device *pdev)
 	}
 
 out:
-	if (plat_dat->fixed_phy_mode)
-		plat_dat->fixed_phy_mode_needs_mdio = of_property_read_bool(pdev->dev.of_node,
+	if (plat_dat->fixed_phy_mode) {
+		of_property_read_u32(np, "wait_for_rx_clk_rdy",
+				     &plat_dat->plat_wait_for_emac_rx_clk_en);
+		plat_dat->fixed_phy_mode_needs_mdio = of_property_read_bool(np,
 									    "fixed-link-needs-mdio-bus");
+	}
 
 	of_node_put(fixed_phy_node);
 	return ret;
@@ -7137,9 +7146,6 @@ static int qcom_ethqos_probe(struct platform_device *pdev)
 		plat_dat->serdes_powersaving = ethqos_serdes_power_saving;
 		plat_dat->xpcs_linkup = ethqos_xpcs_link_up;
 	}
-
-	plat_dat->plat_wait_for_emac_rx_clk_en = of_property_read_bool(np, "wait_for_rx_clk_rdy");
-	plat_dat->rx_clk_rdy = false;
 
 	if (of_property_read_bool(pdev->dev.of_node, "qcom,arm-smmu")) {
 		emac_emb_smmu_ctx.pdev_master = pdev;
