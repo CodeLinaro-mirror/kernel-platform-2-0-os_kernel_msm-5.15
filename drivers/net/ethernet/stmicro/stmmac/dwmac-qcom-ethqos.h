@@ -429,6 +429,7 @@ struct qcom_ethqos {
 	struct clk *rgmii_clk;
 	struct clk *phyaux_clk;
 	struct clk *sgmiref_clk;
+	struct kobject* sysfs_kobj;
 
 #if IS_ENABLED(CONFIG_ETHQOS_QCOM_VER4)
 	/* Clocks required for SGMII and USXGMII interfaces */
