@@ -364,6 +364,16 @@ int qcom_xpcs_verify_lnk_status_usxgmii(struct dw_xpcs_qcom *xpcs)
 }
 EXPORT_SYMBOL(qcom_xpcs_verify_lnk_status_usxgmii);
 
+int qcom_xpcs_verify_an(struct dw_xpcs_qcom *xpcs)
+{
+	u32 val;
+
+	val = qcom_xpcs_read(xpcs, DW_SR_MII_MMD_STS);
+
+	return val & DW_SR_MII_STS_AN_CMPL;
+}
+EXPORT_SYMBOL_GPL(qcom_xpcs_verify_an);
+
 /* Cannot sleep in interrupt-context, increase retries and remove usleep call. */
 static int qcom_xpcs_poll_reset_usxgmii(struct dw_xpcs_qcom *xpcs, unsigned int offset,
 					unsigned int field)
@@ -653,21 +663,18 @@ static int xpcs_config_aneg_c37(struct dw_xpcs_qcom *xpcs)
 {
 	int ret;
 
-	if (!xpcs->fixed_phy_mode) {
-		ret = qcom_xpcs_read(xpcs, DW_SR_MII_MMD_CTRL);
-		if (ret < 0)
-			return -EINVAL;
+	ret = qcom_xpcs_read(xpcs, DW_SR_MII_MMD_CTRL);
+	if (ret < 0)
+		return -EINVAL;
 
-		ret |= AN_CL37_EN;
-		ret = qcom_xpcs_write(xpcs, DW_SR_MII_MMD_CTRL, ret);
-	}
+	ret |= AN_CL37_EN;
+	ret = qcom_xpcs_write(xpcs, DW_SR_MII_MMD_CTRL, ret);
 
 	ret = qcom_xpcs_read(xpcs, DW_VR_MII_AN_CTRL);
 	if (ret < 0)
 		return -EINVAL;
 
-	if (!xpcs->fixed_phy_mode)
-		ret |= DW_VR_MII_TX_CONFIG_MASK;
+	ret |= DW_VR_MII_TX_CONFIG_MASK;
 	ret |= DW_VR_MII_SGMII_LINK_STS;
 
 	return qcom_xpcs_write(xpcs, DW_VR_MII_AN_CTRL, ret);

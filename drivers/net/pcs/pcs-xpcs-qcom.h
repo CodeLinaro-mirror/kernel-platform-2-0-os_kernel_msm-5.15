@@ -202,6 +202,9 @@
 /* SR_MII_AN_ADV */
 #define DW_SR_MII_AN_ADV_FD			BIT(5)
 #define DW_SR_MII_AN_ADV_HD			BIT(6)
+
+/* SR_MII_STS*/
+#define DW_SR_MII_STS_AN_CMPL			BIT(5)
 #define DW_SR_MII_STS_LINK_STS			BIT(2)
 
 /* Required settings to enable 2.5G SGMII mode */
