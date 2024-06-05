@@ -884,6 +884,7 @@ int qcom_ethqos_serdes_update(struct qcom_ethqos *ethqos,
 			      int interface);
 void qcom_ethqos_disable_serdes_clocks(struct qcom_ethqos *ethqos);
 int qcom_ethqos_enable_serdes_clocks(struct qcom_ethqos *ethqos);
+void qcom_ethqos_serdes_phy_soft_reset(struct qcom_ethqos *ethqos);
 void qcom_ethqos_serdes_soft_reset(struct qcom_ethqos *ethqos);
 #else
 static inline int qcom_ethqos_serdes_configure_dt(struct qcom_ethqos *ethqos, int interface)
@@ -905,6 +906,10 @@ void qcom_ethqos_disable_serdes_clocks(struct qcom_ethqos *ethqos)
 int qcom_ethqos_enable_serdes_clocks(struct qcom_ethqos *ethqos)
 {
 	return 0;
+}
+
+void qcom_ethqos_serdes_phy_soft_reset(struct qcom_ethqos *ethqos)
+{
 }
 
 void qcom_ethqos_serdes_soft_reset(struct qcom_ethqos *ethqos)
