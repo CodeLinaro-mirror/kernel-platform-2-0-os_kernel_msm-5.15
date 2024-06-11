@@ -6481,12 +6481,22 @@ static void ethqos_xpcs_link_up(void *priv_n, unsigned int speed)
 {
 	struct qcom_ethqos *ethqos = priv_n;
 	struct stmmac_priv *priv = qcom_ethqos_get_priv(ethqos);
+	u32 retry = 10;
 
-	if (!priv || !priv->dev->phydev || !priv->hw->qxpcs)
+	if (!priv || !priv->hw->qxpcs)
 		return;
 
 	qcom_xpcs_link_up(&priv->hw->qxpcs->pcs, 1, priv->plat->interface,
-			  speed, priv->dev->phydev->duplex);
+			  speed, priv->hw->link.duplex);
+	if (priv->plat->fixed_phy_mode) {
+		// Check AN completed and do serdes reset when client reconnects
+		do {
+			if (qcom_xpcs_verify_an(priv->hw->qxpcs))
+				break;
+			qcom_ethqos_serdes_phy_soft_reset(ethqos);
+			usleep_range(15000, 20000);
+		} while (--retry);
+	}
 }
 
 #if IS_ENABLED(CONFIG_ETHQOS_QCOM_HOSTVM)
