@@ -7078,6 +7078,8 @@ static int qcom_ethqos_probe(struct platform_device *pdev)
 
 	if (strlen(mparams.qoscfg_name) != 0) {
 		strscpy(plat_dat->qoscfg, mparams.qoscfg_name, sizeof(mparams.qoscfg_name));
+		memset(plat_dat->rx_queues_cfg, 0, (plat_dat->rx_queues_to_use * sizeof(struct stmmac_rxq_cfg)));
+		memset(plat_dat->tx_queues_cfg, 0, (plat_dat->tx_queues_to_use * sizeof(struct stmmac_txq_cfg)));
 		ret = stmmac_mtl_setup(pdev, plat_dat);
 		if (ret) {
 			stmmac_remove_config_dt(pdev, plat_dat);
