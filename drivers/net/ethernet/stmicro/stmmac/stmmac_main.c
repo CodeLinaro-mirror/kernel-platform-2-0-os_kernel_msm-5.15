@@ -142,8 +142,9 @@ static irqreturn_t stmmac_msi_intr_rx(int irq, void *data);
 static void stmmac_tx_timer_arm(struct stmmac_priv *priv, u32 queue);
 static void stmmac_flush_tx_descriptors(struct stmmac_priv *priv, int queue);
 
-#ifdef CONFIG_DEBUG_FS
 static const struct net_device_ops stmmac_netdev_ops;
+
+#ifdef CONFIG_DEBUG_FS
 static void stmmac_init_fs(struct net_device *dev);
 static void stmmac_exit_fs(struct net_device *dev);
 #endif
