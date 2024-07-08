@@ -6781,6 +6781,7 @@ static int qcom_ethqos_probe(struct platform_device *pdev)
 		}
 		plat_dat->rx_qos_queues_to_use = plat_dat->rx_queues_to_use;
 		plat_dat->tx_qos_queues_to_use = plat_dat->tx_queues_to_use;
+		of_property_read_u32(np, "qos-tx-fifo-depth", &plat_dat->tx_fifo_size);
 		plat_dat->qos_config = true;
 	}
 
