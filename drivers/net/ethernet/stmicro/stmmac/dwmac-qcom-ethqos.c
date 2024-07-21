@@ -2,7 +2,7 @@
 
 // Copyright (c) 2018-19, Linaro Limited
 // Copyright (c) 2021, The Linux Foundation. All rights reserved.
-// Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+// Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
 
 #include <linux/module.h>
 #include <linux/of.h>
@@ -783,7 +783,12 @@ static int set_ethernet_qos_cfg(char *qoscfg)
 	if ((strlen(qoscfg) == 0) || (strlen(qoscfg) > 4))
 		return 1;
 
-	strscpy(mparams.qoscfg_name, qoscfg, sizeof(mparams.qoscfg_name));
+	if (!strcmp("qos", qoscfg)) {
+		strscpy(mparams.qoscfg_name, qoscfg, sizeof(mparams.qoscfg_name));
+	} else {
+		ETHQOSERR("Invalid Eth qos cfg: %s\n", qoscfg);
+		return 1;
+	}
 
 	return 0;
 }
@@ -7816,4 +7821,4 @@ fs_initcall(qcom_ethqos_init_module)
 module_exit(qcom_ethqos_exit_module)
 
 MODULE_DESCRIPTION("Qualcomm ETHQOS driver");
-MODULE_LICENSE("GPL v2");
+MODULE_LICENSE("GPL");
