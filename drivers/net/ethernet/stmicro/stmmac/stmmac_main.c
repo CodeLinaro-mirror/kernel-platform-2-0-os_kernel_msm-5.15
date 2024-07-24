@@ -2633,6 +2633,20 @@ static void free_dma_desc_resources(struct stmmac_priv *priv)
 }
 
 /**
+ * stmmac_flush_all_tx_mtl - flush all MTL queues
+ * @priv: driver private structure
+ */
+static void stmmac_flush_all_tx_mtl(struct stmmac_priv *priv)
+{
+	int queue = 0;
+
+	for (queue = 0; queue < priv->plat->tx_queues_to_use; queue++) {
+		if (!priv->plat->tx_queues_cfg[queue].skip_sw)
+			stmmac_flush_tx_mtl(priv, priv->hw, queue);
+	}
+}
+
+/**
  *  stmmac_mac_enable_rx_queues - Enable MAC rx queues
  *  @priv: driver private structure
  *  Description: It is used for enabling the rx queues in the MAC
@@ -4784,6 +4798,8 @@ static int stmmac_release(struct net_device *dev)
 
 	/* Stop TX/RX DMA and clear the descriptors */
 	stmmac_stop_all_dma(priv);
+
+	stmmac_flush_all_tx_mtl(priv);
 
 	/* Release and free the Rx/Tx resources */
 	free_dma_desc_resources(priv);
