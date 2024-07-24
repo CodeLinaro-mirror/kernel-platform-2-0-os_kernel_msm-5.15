@@ -4631,6 +4631,7 @@ static int stmmac_release(struct net_device *dev)
 	struct stmmac_priv *priv = netdev_priv(dev);
 	u32 chan;
 	int ret = 0;
+	int queue = 0;
 
 	qcom_ethstate_update(priv->plat, EMAC_HW_DOWN);
 
@@ -4678,6 +4679,10 @@ static int stmmac_release(struct net_device *dev)
 
 	/* Stop TX/RX DMA and clear the descriptors */
 	stmmac_stop_all_dma(priv);
+	for (queue = 0; queue < priv->plat->tx_queues_to_use; queue++) {
+		if (!priv->plat->tx_queues_cfg[queue].skip_sw)
+			stmmac_flush_tx_mtl(priv, priv->hw, queue);
+	}
 
 	/* Release and free the Rx/Tx resources */
 	free_dma_desc_resources(priv);
