@@ -1835,6 +1835,7 @@ static void dwxgmac2_flush_tx_mtl(struct mac_device_info *hw,
 	while (1) {
 		if (vy_count > RETRYCOUNT) {
 			pr_err("unable to flush tx queue %d", queue);
+			break;
 		}
 		vy_count++;
 		usleep_range(1000, 1500);
