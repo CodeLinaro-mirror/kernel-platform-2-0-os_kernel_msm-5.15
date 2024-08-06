@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2016, 2018, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -278,10 +278,7 @@ static int msm_hang_detect_probe(struct platform_device *pdev)
 	}
 
 	ret = of_property_read_u32(node, "cluster-id", &fw_cluster_id);
-	if (ret) {
-		pr_err("%s: Missing cluster-id.\n", __func__);
-	} else {
-
+	if (!ret) {
 		for_each_possible_cpu(cpu) {
 			if (topology_physical_package_id(cpu)
 					== fw_cluster_id) {
@@ -295,7 +292,6 @@ static int msm_hang_detect_probe(struct platform_device *pdev)
 					__func__, fw_cluster_id);
 			return -EINVAL;
 		}
-
 	}
 
 	num_chd_entry =
