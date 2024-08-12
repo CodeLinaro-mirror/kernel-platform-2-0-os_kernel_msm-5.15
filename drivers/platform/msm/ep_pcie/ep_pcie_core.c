@@ -2182,9 +2182,9 @@ int ep_pcie_core_enable_endpoint(enum ep_pcie_options opt)
 
 	if (dev->power_on && (opt & EP_PCIE_OPT_POWER_ON)) {
 		EP_PCIE_ERR(dev,
-			"PCIe V%d: request to turn on the power when link is already powered on\n",
+			"PCIe V%d: Power is already on. Do BCR reset before initiating link training\n",
 			dev->rev);
-		goto out;
+		goto pciereset;
 	}
 
 	if (opt & EP_PCIE_OPT_POWER_ON) {
@@ -2251,7 +2251,7 @@ int ep_pcie_core_enable_endpoint(enum ep_pcie_options opt)
 		val = !!(val & PARF_XMLH_LINK_UP);
 
 		if (link_in_l2)
-			goto trainlink;
+			goto pciereset;
 
 		 /* check link status during initial bootup */
 		if (!dev->enumerated) {
@@ -2301,8 +2301,10 @@ int ep_pcie_core_enable_endpoint(enum ep_pcie_options opt)
 				}
 			}
 		}
+	}
 
-trainlink:
+pciereset:
+	if (opt & EP_PCIE_OPT_POWER_ON) {
 		ret = ep_pcie_reset_init(dev);
 		if (ret)
 			goto link_fail;
