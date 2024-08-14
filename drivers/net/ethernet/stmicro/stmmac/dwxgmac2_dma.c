@@ -408,7 +408,19 @@ static int dwxgmac2_get_hw_feature(void __iomem *ioaddr,
 
 	/* MAC HW feature 1 */
 	hw_cap = readl(ioaddr + XGMAC_HW_FEATURE1);
+	/* L3-L4 filtering supported */
 	dma_cap->l3l4fnum = (hw_cap & XGMAC_HWFEAT_L3L4FNUM) >> 27;
+	switch (dma_cap->l3l4fnum) {
+	case 9:
+		dma_cap->l3l4fnum = 16;
+		break;
+	case 10:
+		dma_cap->l3l4fnum = 32;
+		break;
+	default:
+		break;
+	}
+
 	dma_cap->hash_tb_sz = (hw_cap & XGMAC_HWFEAT_HASHTBLSZ) >> 24;
 	dma_cap->rssen = (hw_cap & XGMAC_HWFEAT_RSSEN) >> 20;
 	dma_cap->tsoen = (hw_cap & XGMAC_HWFEAT_TSOEN) >> 18;
@@ -465,9 +477,31 @@ static int dwxgmac2_get_hw_feature(void __iomem *ioaddr,
 	dma_cap->frpes = (hw_cap & XGMAC_HWFEAT_FRPES) >> 11;
 	dma_cap->frpbs = (hw_cap & XGMAC_HWFEAT_FRPPB) >> 9;
 	dma_cap->frpsel = (hw_cap & XGMAC_HWFEAT_FRPSEL) >> 3;
+	/* Extended VLAN tag filters supported */
+	dma_cap->nrvf_num = (hw_cap & XGMAC_HWFEAT_NRVF) >> 0;
+	switch (dma_cap->nrvf_num) {
+	case 0:
+		dma_cap->nrvf_num = 0;
+		break;
+	case 1:
+		dma_cap->nrvf_num = 4;
+		break;
+	case 2:
+		dma_cap->nrvf_num = 8;
+		break;
+	case 3:
+		dma_cap->nrvf_num = 16;
+		break;
+	case 4:
+		dma_cap->nrvf_num = 24;
+		break;
+	case 5:
+		dma_cap->nrvf_num = 32;
+		break;
+	default:
+		break;
+	}
 
-	/* L3L4 filtering feature*/
-	dma_cap->num_l3_l4_filters = 0;
 
 	return 0;
 }
