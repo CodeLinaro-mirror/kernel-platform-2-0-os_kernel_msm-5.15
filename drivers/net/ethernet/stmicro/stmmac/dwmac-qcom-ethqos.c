@@ -588,7 +588,8 @@ int ethqos_handle_prv_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		}
 		ETHQOSINFO("Got ACK or NACK from peer : %d\n", user_data);
 		ethqos->peer_resp = user_data;
-		complete(&ethqos->thermal_timer);
+		if (ethqos->init_complete)
+			complete(&ethqos->thermal_timer);
 		break;
 	case ETHQOS_THERM_SET_LOCAL_ETH_CAP:
 		ETHQOSINFO("Send local Capabilities to peer\n");
@@ -6260,7 +6261,8 @@ enum hrtimer_restart timer_callback(struct hrtimer *timer)
 
 	ETHQOSINFO("%s: Time_out happen\n", __func__);
 	ethqos->peer_resp = TIME_OUT;
-	complete(&ethqos->thermal_timer);
+	if (ethqos->init_complete)
+		complete(&ethqos->thermal_timer);
 	return HRTIMER_NORESTART;
 }
 
@@ -6325,6 +6327,7 @@ int qcom_ethqos_bring_up_phy_if(struct device *dev, bool client_mode)
 			if (ethqos->curr_phy_state == ETHQOS_PHY_STATE_DOWN)
 				netif_device_attach(ndev);
 			init_completion(&ethqos->thermal_timer);
+			ethqos->init_complete = true;
 			ktime = ktime_set(TIMEOUT_SEC, TIMEOUT_NSEC);
 			hrtimer_init(&ethqos->hr_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 			ethqos->hr_timer.function = &timer_callback;
@@ -6511,6 +6514,7 @@ int qcom_ethqos_bring_down_phy_if(struct device *dev)
 			 return -EINVAL;
 		}
 
+		ethqos->init_complete = false;
 		resource = platform_get_resource_byname(ethqos->pdev,
 							IORESOURCE_MEM, "xpcs");
 		if (!resource) {
