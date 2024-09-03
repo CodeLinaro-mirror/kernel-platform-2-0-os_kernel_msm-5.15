@@ -1,6 +1,8 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
+/* SPDX-License-Identifier: GPL-2.0 */
 /* Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
+
 #ifndef	_DWMAC_QCOM_ETHQOS_H
 #define	_DWMAC_QCOM_ETHQOS_H
 
@@ -571,6 +573,7 @@ struct qcom_ethqos {
 	struct delayed_work tdu_rec;
 	bool tdu_scheduled;
 	int tdu_chan;
+	bool init_complete;
 
 	struct mac_csr_data *mac_reg_list;
 	bool power_state;
