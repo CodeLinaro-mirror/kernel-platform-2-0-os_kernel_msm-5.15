@@ -165,7 +165,7 @@ static void dwxgmac2_dma_rx_mode(void __iomem *ioaddr, int mode,
 	value &= ~XGMAC_RQS;
 	value |= (rqs << XGMAC_RQS_SHIFT) & XGMAC_RQS;
 
-	if ((fifosz >= 4096) && (qmode != MTL_QUEUE_AVB)) {
+	if (fifosz >= 3072 && qmode != MTL_QUEUE_AVB) {
 		u32 flow = readl(ioaddr + XGMAC_MTL_RXQ_FLOW_CONTROL(channel));
 		unsigned int rfd, rfa;
 
@@ -178,6 +178,10 @@ static void dwxgmac2_dma_rx_mode(void __iomem *ioaddr, int mode,
 		 * i.e. 1500 bytes.
 		 */
 		switch (fifosz) {
+		case 3072:
+			rfd = 0x1; /* Full-1.5K */
+			rfa = 0x0; /* Full-1K */
+			break;
 		case 4096:
 			/* This violates the above formula because of FIFO size
 			 * limit therefore overflow may occur in spite of this.
