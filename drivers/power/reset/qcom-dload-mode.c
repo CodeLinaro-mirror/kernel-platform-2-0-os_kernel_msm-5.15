@@ -27,15 +27,19 @@ enum qcom_download_dest {
 struct qcom_dload {
 	struct notifier_block panic_nb;
 	struct notifier_block reboot_nb;
+	struct notifier_block restart_nb;
 	struct kobject kobj;
 
 	bool in_panic;
+	bool in_reboot;
 	void __iomem *dload_dest_addr;
 };
 
 #define to_qcom_dload(o) container_of(o, struct qcom_dload, kobj)
 
 #define QCOM_DOWNLOAD_BOTHDUMP (QCOM_DOWNLOAD_FULLDUMP | QCOM_DOWNLOAD_MINIDUMP)
+
+#define QCOM_FULLDUMP_COMPRESS	0x0100
 
 static bool enable_dump =
 	IS_ENABLED(CONFIG_POWER_RESET_QCOM_DOWNLOAD_MODE_DEFAULT);
@@ -51,6 +55,13 @@ static int set_download_mode(enum qcom_download_mode mode)
 			return -ENODEV;
 	}
 	current_download_mode = mode;
+
+/* Enable fulldump compression when emmc_dload cookie is set */
+#ifdef CONFIG_POWER_RESET_QCOM_DOWNLOAD_MODE_COMPRESS
+	if (current_download_mode == QCOM_DOWNLOAD_FULLDUMP)
+		mode |= QCOM_FULLDUMP_COMPRESS;
+#endif
+
 	qcom_scm_set_download_mode(mode, 0);
 	return 0;
 }
@@ -61,8 +72,11 @@ static int set_dump_mode(enum qcom_download_mode mode)
 
 	if (enable_dump) {
 		ret = set_download_mode(mode);
-		if (likely(!ret))
+		if (likely(!ret)) {
 			dump_mode = qcom_scm_get_download_mode(&temp, 0) ? dump_mode : temp;
+			if (current_download_mode == QCOM_DOWNLOAD_FULLDUMP)
+				dump_mode &= ~QCOM_FULLDUMP_COMPRESS;
+		}
 	} else
 		dump_mode = mode;
 
@@ -273,17 +287,29 @@ static int qcom_dload_panic(struct notifier_block *this, unsigned long event,
 	return NOTIFY_OK;
 }
 
+static int qcom_dload_restart(struct notifier_block *this, unsigned long event,
+			      void *ptr)
+{
+	struct qcom_dload *poweroff = container_of(this, struct qcom_dload,
+						   restart_nb);
+
+	if (!poweroff->in_panic && !poweroff->in_reboot) {
+		qcom_scm_disable_sdi();
+		set_download_mode(QCOM_DOWNLOAD_NODUMP);
+	}
+
+	return NOTIFY_OK;
+}
+
 static int qcom_dload_reboot(struct notifier_block *this, unsigned long event,
 			      void *ptr)
 {
 	char *cmd = ptr;
 	struct qcom_dload *poweroff = container_of(this, struct qcom_dload,
-						     reboot_nb);
+						   reboot_nb);
 
-	/* Clean shutdown, disable dump mode to allow normal restart */
-	if (!poweroff->in_panic)
-		set_download_mode(QCOM_DOWNLOAD_NODUMP);
-
+	poweroff->in_reboot = true;
+	set_download_mode(QCOM_DOWNLOAD_NODUMP);
 	if (cmd) {
 		if (!strcmp(cmd, "edl"))
 			set_download_mode(QCOM_DOWNLOAD_EDL);
@@ -344,6 +370,10 @@ static int qcom_dload_probe(struct platform_device *pdev)
 	poweroff->dload_dest_addr = map_prop_mem("qcom,msm-imem-dload-type");
 	msm_enable_dump_mode(enable_dump);
 	dump_mode = qcom_scm_get_download_mode(&temp, 0) ? dump_mode : temp;
+
+	/* Reset the value of current_download_mode to it's initial value */
+	if (current_download_mode == QCOM_DOWNLOAD_FULLDUMP)
+		dump_mode &= ~QCOM_FULLDUMP_COMPRESS;
 	pr_info("%s: Current dump mode: 0x%x\n", __func__, dump_mode);
 
 	if (!enable_dump)
@@ -359,6 +389,10 @@ static int qcom_dload_probe(struct platform_device *pdev)
 	register_reboot_notifier(&poweroff->reboot_nb);
 	register_syscore_ops(&qcom_dload_syscore_ops);
 
+	poweroff->restart_nb.notifier_call = qcom_dload_restart;
+	poweroff->restart_nb.priority = 201;
+	register_restart_handler(&poweroff->restart_nb);
+
 	platform_set_drvdata(pdev, poweroff);
 
 	return 0;
@@ -370,6 +404,8 @@ static int qcom_dload_remove(struct platform_device *pdev)
 
 	atomic_notifier_chain_unregister(&panic_notifier_list,
 					 &poweroff->panic_nb);
+
+	unregister_restart_handler(&poweroff->restart_nb);
 	unregister_reboot_notifier(&poweroff->reboot_nb);
 
 	if (poweroff->dload_dest_addr)
