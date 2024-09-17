@@ -8,7 +8,6 @@
 #include <linux/bitops.h>
 #include <linux/cpumask.h>
 #include <linux/console.h>
-#include <linux/debugfs.h>
 #include <linux/delay.h>
 #include <linux/dmaengine.h>
 #include <linux/dma-mapping.h>
@@ -368,7 +367,6 @@ struct msm_geni_serial_port {
 	unsigned int kpi_idx;
 	unsigned int kpi_comp_idx;
 	enum geni_se_xfer_mode xfer_mode;
-	struct dentry *dbg;
 	bool port_setup;
 	unsigned int *rx_fifo;
 	int (*handle_rx)(struct uart_port *uport,
@@ -4649,10 +4647,6 @@ static void msm_geni_serial_debug_init(struct uart_port *uport, bool console)
 	struct msm_geni_serial_port *msm_port = GET_DEV_PORT(uport);
 	char name[35];
 
-	msm_port->dbg = debugfs_create_dir(dev_name(uport->dev), NULL);
-	if (IS_ERR_OR_NULL(msm_port->dbg))
-		dev_err(uport->dev, "Failed to create dbg dir\n");
-
 	if (!console) {
 		memset(name, 0, sizeof(name));
 		if (!msm_port->ipc_log_rx) {
@@ -5416,7 +5410,6 @@ static int msm_geni_serial_remove(struct platform_device *pdev)
 	device_remove_file(port->uport.dev, &dev_attr_xfer_mode);
 	device_remove_file(port->uport.dev, &dev_attr_ver_info);
 	device_remove_file(port->uport.dev, &dev_attr_capture_kpi);
-	debugfs_remove(port->dbg);
 
 	dev_info(&pdev->dev, "%s driver removed %d\n", __func__, true);
 	return 0;
