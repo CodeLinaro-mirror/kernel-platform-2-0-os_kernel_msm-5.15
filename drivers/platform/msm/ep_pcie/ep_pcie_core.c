@@ -4635,7 +4635,6 @@ static int ep_pcie_probe(struct platform_device *pdev)
 		EP_PCIE_ERR(&ep_pcie_dev,
 			"PCIe V%d: failed to init GPIO\n",
 			ep_pcie_dev.rev);
-		ep_pcie_release_resources(&ep_pcie_dev);
 		goto gpio_failure;
 	}
 
@@ -4644,8 +4643,6 @@ static int ep_pcie_probe(struct platform_device *pdev)
 		EP_PCIE_ERR(&ep_pcie_dev,
 			"PCIe V%d: failed to init IRQ\n",
 			ep_pcie_dev.rev);
-		ep_pcie_release_resources(&ep_pcie_dev);
-		ep_pcie_gpio_deinit(&ep_pcie_dev);
 		goto irq_failure;
 	}
 
