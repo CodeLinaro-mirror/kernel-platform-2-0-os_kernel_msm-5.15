@@ -1259,7 +1259,10 @@ static void stmmac_validate(struct phylink_config *config,
 	if (priv->hw->qxpcs)
 		qcom_xpcs_validate(priv->hw->qxpcs, supported, state);
 
-	phy_speeds(&priv->plat->max_supported_speed, 1, supported);
+	if (priv->plat->fixed_phy_mode)
+		priv->plat->max_supported_speed = priv->plat->fixed_phy_speed;
+	else
+		phy_speeds(&priv->plat->max_supported_speed, 1, supported);
 
 }
 

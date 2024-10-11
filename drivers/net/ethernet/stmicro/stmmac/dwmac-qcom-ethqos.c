@@ -6364,6 +6364,7 @@ static int ethqos_fixed_link_check(struct platform_device *pdev)
 		of_property_read_u32(fixed_phy_node, "speed", &mac2mac_speed);
 		plat_dat->fixed_phy_mode = true;
 		plat_dat->phy_addr = -1;
+		plat_dat->fixed_phy_speed = mac2mac_speed;
 		ETHQOSINFO("mac2mac mode: Fixed-link enabled from dt, Speed = %d\n",
 			   mac2mac_speed);
 		goto out;
@@ -6418,6 +6419,8 @@ static int ethqos_fixed_link_check(struct platform_device *pdev)
 				ETHQOSERR("Fixed-link speed update failed\n");
 				return -ENOENT;
 			}
+
+			plat_dat->fixed_phy_speed = mparams.link_speed;
 
 			ETHQOSINFO("mac2mac mode: Fixed-link speed updated from partition: %u\n",
 				   mparams.link_speed);
