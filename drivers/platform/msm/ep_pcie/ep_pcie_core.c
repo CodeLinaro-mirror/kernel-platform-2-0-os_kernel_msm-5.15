@@ -2307,7 +2307,7 @@ int ep_pcie_core_enable_endpoint(enum ep_pcie_options opt)
 					dev->rev);
 					goto pipe_clk_fail;
 				}
-				goto checkbme;
+				goto fw_linkup;
 			} else {
 				ltssm_en = readl_relaxed(dev->parf
 					+ PCIE20_PARF_LTSSM) & BIT(8);
@@ -2478,7 +2478,7 @@ pciereset:
 			"PCIe - link initialized for LE PCIe endpoint\n");
 	}
 
-checkbme:
+fw_linkup:
 	reg = readl_relaxed(dev->dm_core + PCIE20_CAP_LINKCTRLSTATUS);
 	dev->current_link_speed = (reg >> LINK_STATUS_REG_SHIFT) & PCI_EXP_LNKSTA_CLS;
 	dev->current_link_width = ((reg >> LINK_STATUS_REG_SHIFT) & PCI_EXP_LNKSTA_NLW) >>
@@ -2516,6 +2516,7 @@ checkbme:
 	if (dev->active_config)
 		ep_pcie_write_reg(dev->dm_core, PCIE20_AUX_CLK_FREQ_REG, dev->aux_clk_val);
 
+checkbme:
 	if (!(opt & EP_PCIE_OPT_ENUM_ASYNC)) {
 		/* Wait for up to 1000ms for BME to be set */
 		retries = 0;
