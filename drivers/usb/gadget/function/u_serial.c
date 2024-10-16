@@ -464,6 +464,11 @@ static void gs_read_complete(struct usb_ep *ep, struct usb_request *req)
 	struct gs_port	*port = ep->driver_data;
 
 	spin_lock(&port->port_lock);
+	if (!port->port_usb)  {
+		spin_unlock(&port->port_lock);
+		return;
+	}
+
 	if (port->suspended) {
 		/* Read complete received as part of dequeue, so add it back to read_pool */
 		list_add_tail(&req->list, &port->read_pool);
