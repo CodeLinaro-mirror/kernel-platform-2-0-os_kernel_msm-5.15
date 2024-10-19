@@ -2350,6 +2350,10 @@ static int ethqos_configure_usxgmii_v4(struct qcom_ethqos *ethqos)
 	return 0;
 }
 
+/**
+ * Separate out serdes programming from mac configuration for mac2mac
+ * to ensure mac is configured after serdes programming done.
+ */
 static int ethqos_configure_mac_v4(struct qcom_ethqos *ethqos)
 {
 	struct stmmac_priv *priv = qcom_ethqos_get_priv(ethqos);
@@ -2365,20 +2369,50 @@ static int ethqos_configure_mac_v4(struct qcom_ethqos *ethqos)
 
 	case PHY_INTERFACE_MODE_SGMII:
 		ret = ethqos_configure_sgmii_v4(ethqos);
-		qcom_ethqos_serdes_update(ethqos, ethqos->speed, priv->plat->interface);
+		if (!priv->plat->fixed_phy_mode)
+			qcom_ethqos_serdes_update(ethqos, ethqos->speed, priv->plat->interface);
 		break;
 
 	case PHY_INTERFACE_MODE_2500BASEX:
 		ret = ethqos_configure_sgmii_v4(ethqos);
-		qcom_ethqos_serdes_update(ethqos, ethqos->speed, priv->plat->interface);
+		if (!priv->plat->fixed_phy_mode)
+			qcom_ethqos_serdes_update(ethqos, ethqos->speed, priv->plat->interface);
 		break;
 	case PHY_INTERFACE_MODE_5GBASER:
 		ret = ethqos_configure_usx5g_v4(ethqos);
-		qcom_ethqos_serdes_update(ethqos, ethqos->speed, priv->plat->interface);
+		if (!priv->plat->fixed_phy_mode)
+			qcom_ethqos_serdes_update(ethqos, ethqos->speed, priv->plat->interface);
 		break;
 	case PHY_INTERFACE_MODE_USXGMII:
 		ret = ethqos_configure_usxgmii_v4(ethqos);
-		qcom_ethqos_serdes_update(ethqos, ethqos->speed, priv->plat->interface);
+		if (!priv->plat->fixed_phy_mode)
+			qcom_ethqos_serdes_update(ethqos, ethqos->speed, priv->plat->interface);
+		break;
+	}
+
+	return ret;
+}
+
+static int ethqos_serdes_update(void *priv_n, unsigned int speed)
+{
+	struct qcom_ethqos *ethqos = priv_n;
+	struct stmmac_priv *priv = qcom_ethqos_get_priv(ethqos);
+	int ret = 0;
+
+	if (ethqos->emac_ver != EMAC_HW_v4_0_0)
+		return 0;
+
+	switch (priv->plat->interface) {
+	case PHY_INTERFACE_MODE_RGMII:
+	case PHY_INTERFACE_MODE_RGMII_ID:
+	case PHY_INTERFACE_MODE_RGMII_RXID:
+	case PHY_INTERFACE_MODE_RGMII_TXID:
+		break;
+	case PHY_INTERFACE_MODE_SGMII:
+	case PHY_INTERFACE_MODE_2500BASEX:
+	case PHY_INTERFACE_MODE_5GBASER:
+	case PHY_INTERFACE_MODE_USXGMII:
+		ret = qcom_ethqos_serdes_update(ethqos, speed, priv->plat->interface);
 		break;
 	}
 
@@ -3416,8 +3450,11 @@ static void setup_config_registers(struct qcom_ethqos *ethqos,
 	}
 	priv->speed  = speed;
 
-	if (speed != SPEED_UNKNOWN)
+	if (speed != SPEED_UNKNOWN) {
+		if (priv->plat->fixed_phy_mode)
+			ethqos_serdes_update(ethqos, speed);
 		ethqos_fix_mac_speed(ethqos, speed);
+	}
 
 	/*We need to reset the clks when speed change occurs on remote
 	 *this is because we need to align rgmii clocks with data else
@@ -6733,16 +6770,122 @@ int ethqos_enable_power_saving(struct net_device *ndev, bool enable)
 }
 #endif
 
+/**
+ * Currently c37 an is not supported on 2500Basex and SGMII 2.5Gbps
+ */
+bool is_c37_an_supported(struct stmmac_priv *priv)
+{
+	if (priv->plat->interface == PHY_INTERFACE_MODE_2500BASEX)
+		return false;
+	if (priv->speed == SPEED_2500 && priv->plat->interface == PHY_INTERFACE_MODE_SGMII)
+		return false;
+	return true;
+}
+
+void ethqos_set_mac_speed_mode_duplex(struct stmmac_priv *priv, int speed,
+				      phy_interface_t interface, int duplex)
+{
+	u32 ctrl;
+
+	ctrl = readl(priv->ioaddr + MAC_CTRL_REG);
+	ctrl &= ~priv->hw->link.speed_mask;
+
+	if (interface == PHY_INTERFACE_MODE_USXGMII || interface == PHY_INTERFACE_MODE_5GBASER) {
+		switch (speed) {
+		case SPEED_10000:
+			ctrl |= priv->hw->link.xgmii.speed10000;
+			break;
+		case SPEED_5000:
+			ctrl |= priv->hw->link.xgmii.speed5000;
+			break;
+		case SPEED_2500:
+			ctrl |= priv->hw->link.xgmii.speed2500;
+			break;
+		case SPEED_1000:
+			ctrl |= priv->hw->link.speed1000;
+			break;
+		case SPEED_100:
+			ctrl |= priv->hw->link.speed100;
+			break;
+		case SPEED_10:
+			ctrl |= priv->hw->link.speed10;
+			break;
+		default:
+			return;
+		}
+	} else if (interface == PHY_INTERFACE_MODE_XLGMII) {
+		switch (speed) {
+		case SPEED_100000:
+			ctrl |= priv->hw->link.xlgmii.speed100000;
+			break;
+		case SPEED_50000:
+			ctrl |= priv->hw->link.xlgmii.speed50000;
+			break;
+		case SPEED_40000:
+			ctrl |= priv->hw->link.xlgmii.speed40000;
+			break;
+		case SPEED_25000:
+			ctrl |= priv->hw->link.xlgmii.speed25000;
+			break;
+		case SPEED_10000:
+			ctrl |= priv->hw->link.xgmii.speed10000;
+			break;
+		case SPEED_2500:
+			ctrl |= priv->hw->link.speed2500;
+			break;
+		case SPEED_1000:
+			ctrl |= priv->hw->link.speed1000;
+			break;
+		default:
+			return;
+		}
+	} else {
+		switch (speed) {
+		case SPEED_2500:
+			if (interface == PHY_INTERFACE_MODE_2500BASEX)
+				ctrl |= priv->hw->link.xgmii.speed2500;
+			else
+				ctrl |= priv->hw->link.speed2500;
+			break;
+		case SPEED_1000:
+			ctrl |= priv->hw->link.speed1000;
+			break;
+		case SPEED_100:
+			ctrl |= priv->hw->link.speed100;
+			break;
+		case SPEED_10:
+			ctrl |= priv->hw->link.speed10;
+			break;
+		default:
+			return;
+		}
+	}
+
+	if (!duplex)
+		ctrl &= ~priv->hw->link.duplex;
+	else
+		ctrl |= priv->hw->link.duplex;
+
+	writel(ctrl, priv->ioaddr + MAC_CTRL_REG);
+}
+
 static void ethqos_xpcs_link_up(void *priv_n, unsigned int speed)
 {
 	struct qcom_ethqos *ethqos = priv_n;
 	struct stmmac_priv *priv = qcom_ethqos_get_priv(ethqos);
 
-	if (!priv || !priv->dev->phydev || !priv->hw->qxpcs)
+	if (!priv || !priv->hw->qxpcs) {
+		ETHQOSERR("QXPCS doesn't exist");
 		return;
+	}
 
-	qcom_xpcs_link_up(&priv->hw->qxpcs->pcs, 1, priv->plat->interface,
-			  speed, priv->dev->phydev->duplex);
+	// SGMII 2.5Gbps and 2500BaseX doesn't support PCS AN interrupt
+	if (priv->plat->fixed_phy_mode && is_c37_an_supported(priv) && priv->hw->qxpcs->c37_an_en)
+		qcom_xpcs_configure_intr(&priv->hw->qxpcs->pcs, priv->plat->interface,
+					 speed, DUPLEX_FULL);
+	else if (priv->dev->phydev)
+		qcom_xpcs_link_up(&priv->hw->qxpcs->pcs, 1, priv->plat->interface,
+				  speed, priv->dev->phydev->duplex);
 }
 
 #if IS_ENABLED(CONFIG_ETHQOS_QCOM_HOSTVM)
@@ -7550,6 +7693,7 @@ static int qcom_ethqos_probe(struct platform_device *pdev)
 	plat_dat->early_eth = ethqos->early_eth_enabled;
 	plat_dat->bsp_priv = ethqos;
 	plat_dat->fix_mac_speed = ethqos_fix_mac_speed;
+	plat_dat->serdes_update_speed = ethqos_serdes_update;
 	plat_dat->dump_debug_regs = rgmii_dump;
 	plat_dat->tx_select_queue = dwmac_qcom_select_queue;
 	plat_dat->get_plat_tx_coal_frames =  dwmac_qcom_get_plat_tx_coal_frames;
@@ -7732,6 +7876,8 @@ static int qcom_ethqos_probe(struct platform_device *pdev)
 
 	/*Configure EMAC for 10 Mbps mode*/
 	ethqos->probed = true;
+	if (plat_dat->fixed_phy_mode)
+		plat_dat->serdes_update_speed(plat_dat->bsp_priv, 10);
 	plat_dat->fix_mac_speed(plat_dat->bsp_priv, 10);
 
 	if (of_property_read_bool(np, "pcs-v3")) {
