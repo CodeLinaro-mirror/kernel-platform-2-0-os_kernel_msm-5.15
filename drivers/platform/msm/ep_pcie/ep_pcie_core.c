@@ -2199,10 +2199,12 @@ int ep_pcie_core_enable_endpoint(enum ep_pcie_options opt)
 		goto out;
 	}
 
-	if (dev->link_status == EP_PCIE_LINK_UP)
+	if (dev->link_status == EP_PCIE_LINK_UP) {
 		EP_PCIE_DBG(dev,
-			"PCIe V%d: link is already up, let's proceed with the voting for the resources\n",
+			"PCIe V%d: link is already up, but BME is not set\n",
 			dev->rev);
+		goto checkbme;
+	}
 
 	if (dev->power_on && (opt & EP_PCIE_OPT_POWER_ON)) {
 		EP_PCIE_ERR(dev,
