@@ -7412,8 +7412,15 @@ static int qcom_ethqos_suspend(struct device *dev)
 
 	qcom_ethqos_phy_suspend_clks(ethqos);
 
+	if (priv->plat->interface == PHY_INTERFACE_MODE_RGMII_RXID ||
+	    priv->plat->interface == PHY_INTERFACE_MODE_RGMII_ID ||
+	    priv->plat->interface == PHY_INTERFACE_MODE_RGMII ||
+	    priv->plat->interface == PHY_INTERFACE_MODE_RGMII_TXID) {
+		ethqos_set_rgmii_txc_gpio_sleep(ethqos);
+	}
+
 	if (ethqos->current_phy_mode == DISABLE_PHY_AT_SUSPEND_ONLY ||
-	    ethqos->current_phy_mode == DISABLE_PHY_SUSPEND_ENABLE_RESUME) {
+		ethqos->current_phy_mode == DISABLE_PHY_SUSPEND_ENABLE_RESUME) {
 		ETHQOSINFO("disable phy at suspend\n");
 		ethqos_phy_power_off(ethqos);
 	}
@@ -7438,7 +7445,7 @@ static int qcom_ethqos_resume(struct device *dev)
 	struct net_device *ndev = NULL;
 	struct qcom_ethqos *ethqos;
 	int ret;
-	struct stmmac_priv *priv;
+	struct stmmac_priv *priv = NULL;
 
 	ETHQOSDBG("Resume Enter\n");
 	if (of_device_is_compatible(dev->of_node, "qcom,emac-smmu-embedded"))
@@ -7453,6 +7460,21 @@ static int qcom_ethqos_resume(struct device *dev)
 	if (!ethqos)
 		return -ENODEV;
 
+	ndev = dev_get_drvdata(dev);
+	priv = netdev_priv(ndev);
+
+	if (!ndev) {
+		ETHQOSERR(" Resume not possible\n");
+		return -EINVAL;
+	}
+
+	if (priv->plat->interface == PHY_INTERFACE_MODE_RGMII_RXID ||
+	    priv->plat->interface == PHY_INTERFACE_MODE_RGMII_ID ||
+	    priv->plat->interface == PHY_INTERFACE_MODE_RGMII ||
+	    priv->plat->interface == PHY_INTERFACE_MODE_RGMII_TXID) {
+		ethqos_set_rgmii_txc_gpio_active(ethqos);
+	}
+
 	if (ethqos->gdsc_off_on_suspend) {
 		if (ethqos->gdsc_emac) {
 			ret = regulator_enable(ethqos->gdsc_emac);
@@ -7464,13 +7486,7 @@ static int qcom_ethqos_resume(struct device *dev)
 		ETHQOSDBG("Enabled <%s>\n", EMAC_GDSC_EMAC_NAME);
 	}
 
-	ndev = dev_get_drvdata(dev);
-	priv = netdev_priv(ndev);
 
-	if (!ndev) {
-		ETHQOSERR(" Resume not possible\n");
-		return -EINVAL;
-	}
 
 	if (ethqos->current_phy_mode == DISABLE_PHY_SUSPEND_ENABLE_RESUME) {
 		ETHQOSINFO("enable phy at resume\n");
@@ -7485,7 +7501,6 @@ static int qcom_ethqos_resume(struct device *dev)
 	enable_irq(priv->dev->irq);
 
 	if (ethqos->vreg_a_sgmii_1p2 && ethqos->vreg_a_sgmii_0p9) {
-
 		ret = qcom_ethqos_enable_serdes_clocks(ethqos);
 		if (ret)
 			return -EINVAL;
