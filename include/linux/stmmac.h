@@ -374,5 +374,6 @@ struct plat_stmmacenet_data {
 	bool enable_pfc;
 	bool qos_use_skprio;
 	bool qos_supported;
+	bool enable_aux_ts;
 };
 #endif
