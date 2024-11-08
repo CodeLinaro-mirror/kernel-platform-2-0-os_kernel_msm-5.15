@@ -7549,6 +7549,11 @@ static int qcom_ethqos_probe(struct platform_device *pdev)
 		plat_dat->has_c22_mdio_probe_capability = 0;
 	}
 
+	if (!!of_find_property(np, "eth_aux_ts_enabled", NULL))
+		plat_dat->enable_aux_ts = true;
+
+	ETHQOSDBG("Aux Timestamp Feature  = %d\n", plat_dat->enable_aux_ts);
+
 	plat_dat->tso_en = of_property_read_bool(np, "snps,tso");
 	plat_dat->handle_prv_ioctl = ethqos_handle_prv_ioctl;
 	plat_dat->request_phy_wol = qcom_ethqos_request_phy_wol;
