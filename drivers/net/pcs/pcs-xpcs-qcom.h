@@ -211,6 +211,9 @@
 #define LINK_TIMER_1P6MS			0x07a1
 #define CL37_TMR_OVR_RIDE			BIT(3)
 
+/* Required settings for C37 Auto-negotiation in USXGMII */
+#define LINK_TIMER_USXGMII			0x172
+
 /* EEE Ability register defines */
 #define KREEE_SUPPORT				BIT(6)
 #define KX4EEE_SUPPORT				BIT(5)

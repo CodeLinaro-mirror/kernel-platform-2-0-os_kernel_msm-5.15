@@ -408,40 +408,10 @@ int qcom_xpcs_verify_lnk_status_usxgmii(struct dw_xpcs_qcom *xpcs)
 }
 EXPORT_SYMBOL(qcom_xpcs_verify_lnk_status_usxgmii);
 
-/* Cannot sleep in interrupt-context, increase retries and remove usleep call. */
-static int qcom_xpcs_poll_reset_usxgmii(struct dw_xpcs_qcom *xpcs, unsigned int offset,
-					unsigned int field)
-{
-	unsigned int retries = 1000;
-	int ret;
-
-	do {
-		ret = qcom_xpcs_read(xpcs, offset);
-		if (ret < 0)
-			return ret;
-	} while (ret & field && --retries);
-
-	return (ret & field) ? -ETIMEDOUT : 0;
-}
-
 /* Reset PCS and USXGMII Rate Adaptor Logic*/
 static int qcom_xpcs_reset_usxgmii(struct dw_xpcs_qcom *xpcs)
 {
 	int ret;
-
-	ret = qcom_xpcs_read(xpcs, DW_VR_MII_DIG_CTRL1);
-	if (ret < 0)
-		return ret;
-
-	ret = qcom_xpcs_write(xpcs, DW_VR_MII_DIG_CTRL1, ret | SOFT_RST);
-
-	if (!xpcs->intr_en)
-		ret = qcom_xpcs_poll_reset(xpcs, DW_VR_MII_DIG_CTRL1, SW_RST_BIT_STATUS);
-	else
-		ret = qcom_xpcs_poll_reset_usxgmii(xpcs, DW_VR_MII_DIG_CTRL1, SW_RST_BIT_STATUS);
-
-	if (ret < 0)
-		return ret;
 
 	ret = qcom_xpcs_read(xpcs, DW_VR_MII_PCS_DIG_CTRL1);
 	if (ret < 0)
@@ -449,10 +419,7 @@ static int qcom_xpcs_reset_usxgmii(struct dw_xpcs_qcom *xpcs)
 
 	ret = qcom_xpcs_write(xpcs, DW_VR_MII_PCS_DIG_CTRL1, ret | DW_USXGMII_RST);
 
-	if (!xpcs->intr_en)
-		return qcom_xpcs_poll_reset(xpcs, DW_VR_MII_DIG_CTRL1, SW_RST_BIT_STATUS);
-
-	return qcom_xpcs_poll_reset_usxgmii(xpcs, DW_VR_MII_PCS_DIG_CTRL1, USXG_RST_BIT_STATUS);
+	return qcom_xpcs_poll_reset(xpcs, DW_VR_MII_PCS_DIG_CTRL1, USXG_RST_BIT_STATUS);
 }
 
 int qcom_xpcs_soft_reset_usxgmii(struct dw_xpcs_qcom *xpcs)
@@ -580,7 +547,7 @@ static int qcom_xpcs_sgmii_read_intr_status(struct dw_xpcs_qcom *xpcs)
 		return qcom_xpcs_write(xpcs, DW_VR_MII_AN_CTRL, an_ctrl);
 	} else {
 		XPCSERR("Link is down, aborting\n");
-		return 0;
+		return -EINVAL;
 	}
 }
 
@@ -633,6 +600,9 @@ static int qcom_xpcs_usxgmii_read_intr_status(struct dw_xpcs_qcom *xpcs)
 
 		mmd_ctrl = qcom_xpcs_write(xpcs, DW_SR_MII_MMD_CTRL, mmd_ctrl);
 
+		// Wait for XGMII clock get stableized
+		usleep_range(20, 500);
+
 		mmd_ctrl = qcom_xpcs_reset_usxgmii(xpcs);
 		if (mmd_ctrl < 0)
 			XPCSERR("Failed to reset USXGMII\n");
@@ -640,12 +610,12 @@ static int qcom_xpcs_usxgmii_read_intr_status(struct dw_xpcs_qcom *xpcs)
 		return mmd_ctrl;
 	} else {
 		XPCSERR("Link is down, aborting\n");
-		return 0;
+		return -EINVAL;
 	}
 }
 
-static void qcom_xpcs_handle_an_intr(struct dw_xpcs_qcom *xpcs,
-				     phy_interface_t interface)
+int qcom_xpcs_handle_an_intr(struct dw_xpcs_qcom *xpcs,
+			     phy_interface_t interface)
 {
 	int ret = 0;
 
@@ -657,7 +627,7 @@ static void qcom_xpcs_handle_an_intr(struct dw_xpcs_qcom *xpcs,
 			goto out;
 
 		XPCSINFO("Finished Autonegotiation for USXGMII\n");
-		return;
+		return 0;
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_2500BASEX:
 		ret = qcom_xpcs_sgmii_read_intr_status(xpcs);
@@ -665,7 +635,7 @@ static void qcom_xpcs_handle_an_intr(struct dw_xpcs_qcom *xpcs,
 			goto out;
 
 		XPCSINFO("Finished Autonegotiation for SGMII\n");
-		return;
+		return 0;
 	default:
 		XPCSERR("Invalid MII mode for Autonegotiation\n");
 		goto out;
@@ -673,7 +643,9 @@ static void qcom_xpcs_handle_an_intr(struct dw_xpcs_qcom *xpcs,
 
 out:
 	XPCSERR("Failed to handle Autonegotiation interrupt\n");
+	return ret;
 }
+EXPORT_SYMBOL_GPL(qcom_xpcs_handle_an_intr);
 
 int qcom_xpcs_check_aneg_ioc(struct dw_xpcs_qcom *xpcs, phy_interface_t interface)
 {
@@ -695,7 +667,6 @@ int qcom_xpcs_check_aneg_ioc(struct dw_xpcs_qcom *xpcs, phy_interface_t interfac
 	ret &= ~DW_VR_MII_ANCMPLT_INTR;
 	ret = qcom_xpcs_write(xpcs, DW_VR_MII_AN_INTR_STS, ret);
 
-	qcom_xpcs_handle_an_intr(xpcs, interface);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(qcom_xpcs_check_aneg_ioc);
@@ -712,17 +683,16 @@ static int xpcs_config_aneg_c37(struct dw_xpcs_qcom *xpcs)
 
 		ret |= AN_CL37_EN;
 		ret = qcom_xpcs_write(xpcs, DW_SR_MII_MMD_CTRL, ret);
+
+		ret = qcom_xpcs_read(xpcs, DW_VR_MII_AN_CTRL);
+		if (ret < 0)
+			return -EINVAL;
+		ret |= DW_VR_MII_TX_CONFIG_MASK;
+		ret |= DW_VR_MII_SGMII_LINK_STS;
+		return qcom_xpcs_write(xpcs, DW_VR_MII_AN_CTRL, ret);
 	}
 
-	ret = qcom_xpcs_read(xpcs, DW_VR_MII_AN_CTRL);
-	if (ret < 0)
-		return -EINVAL;
-
-	if (!xpcs->fixed_phy_mode)
-		ret |= DW_VR_MII_TX_CONFIG_MASK;
-	ret |= DW_VR_MII_SGMII_LINK_STS;
-
-	return qcom_xpcs_write(xpcs, DW_VR_MII_AN_CTRL, ret);
+	return 0;
 }
 
 static int qcom_xpcs_do_config(struct dw_xpcs_qcom *xpcs, phy_interface_t interface)
@@ -744,6 +714,7 @@ static int qcom_xpcs_do_config(struct dw_xpcs_qcom *xpcs, phy_interface_t interf
 		ret = xpcs_config_aneg_c37(xpcs);
 		if (ret < 0)
 			return ret;
+		XPCSINFO("C37 Autonegotiation is supported.\n");
 		break;
 	default:
 		XPCSERR("Incompatible Autonegotiation mode\n");
@@ -851,8 +822,98 @@ static void qcom_xpcs_get_state(struct phylink_pcs *pcs,
 	}
 }
 
-void qcom_xpcs_link_up_sgmii_2500basex(struct dw_xpcs_qcom *xpcs, int speed,
-				       int duplex, phy_interface_t interface)
+/* @brief XPCS link up function for SGMII and 2500BaseX with AN interrupt enabled
+ * Limitation: SGMII 2.5G and 2500BaseX doesn't support AN interrupt currently,
+ *             so it will call set2p5g_sgmii to disable AN and return early.
+ * @param[in] xpcs qcom xpcs data
+ * @param[in] speed link speed
+ * @param[in] duplex full duplex or half duplex
+ * @param[in] interface phy interface
+ */
+static void qcom_xpcs_link_up_sgmii_2500basex_intr(struct dw_xpcs_qcom *xpcs, int speed,
+						   int duplex, phy_interface_t interface)
+{
+	int mmd_ctrl, an_ctrl;
+	int ret = 0;
+
+	if (speed == SPEED_2500) {
+		ret = qcom_xpcs_set_2p5g_sgmii(xpcs, duplex);
+		if (ret < 0)
+			goto err;
+		goto out;
+	} else if (xpcs->sgmii_2p5g_en) {
+		ret = qcom_xpcs_unset_2p5g_sgmii(xpcs);
+		if (ret < 0)
+			goto err;
+	}
+
+	// Disable C37 AN first
+	mmd_ctrl = qcom_xpcs_read(xpcs, DW_SR_MII_MMD_CTRL);
+	if (mmd_ctrl < 0)
+		goto err;
+	mmd_ctrl &= ~AN_CL37_EN;
+	ret = qcom_xpcs_write(xpcs, DW_SR_MII_MMD_CTRL, ret);
+
+	// Program VR_MII_AN_CTRL to enable AN complete interrupt, PHY side
+	an_ctrl = qcom_xpcs_read(xpcs, DW_VR_MII_AN_CTRL);
+	if (an_ctrl < 0)
+		goto err;
+	an_ctrl |= DW_VR_MII_AN_INTR_EN;
+	an_ctrl |= DW_VR_MII_TX_CONFIG_PHY_SIDE << DW_VR_MII_AN_CTRL_TX_CONFIG_SHIFT;
+	an_ctrl |= DW_VR_MII_SGMII_LINK_STS;
+	ret = qcom_xpcs_write(xpcs, DW_VR_MII_AN_CTRL, an_ctrl);
+
+	mmd_ctrl = qcom_xpcs_read(xpcs, DW_SR_MII_MMD_CTRL);
+	if (mmd_ctrl < 0)
+		goto err;
+	mmd_ctrl &= ~DW_SGMII_SS_MASK;
+
+	switch (speed) {
+	case SPEED_1000:
+		mmd_ctrl |= DW_GMII_1000;
+		an_ctrl |= DW_VR_MII_CTRL;
+		XPCSINFO("1Gbps-SGMII enabled\n");
+		break;
+	case SPEED_100:
+		mmd_ctrl |= DW_GMII_100;
+		an_ctrl &= ~DW_VR_MII_CTRL;
+		XPCSINFO("100Mbps-SGMII enabled\n");
+		break;
+	case SPEED_10:
+		an_ctrl &= ~DW_VR_MII_CTRL;
+		XPCSINFO("10Mbps-SGMII enabled\n");
+		break;
+	default:
+		XPCSERR("Invalid speed mode: %d\n", speed);
+		return;
+	}
+
+	if (duplex == DUPLEX_FULL)
+		mmd_ctrl |= DW_FULL_DUPLEX;
+	ret = qcom_xpcs_write(xpcs, DW_SR_MII_MMD_CTRL, mmd_ctrl);
+	ret = qcom_xpcs_write(xpcs, DW_VR_MII_AN_CTRL, an_ctrl);
+
+	ret = qcom_xpcs_read(xpcs, DW_SR_MII_AN_ADV);
+	if (ret < 0)
+		goto err;
+	ret |= DW_SR_MII_AN_ADV_FD;
+	ret = qcom_xpcs_write(xpcs, DW_SR_MII_AN_ADV, ret);
+
+	// Enable c37 autoneg
+	mmd_ctrl = qcom_xpcs_read(xpcs, DW_SR_MII_MMD_CTRL);
+	if (ret < 0)
+		goto err;
+	mmd_ctrl |= AN_CL37_EN;
+	ret = qcom_xpcs_write(xpcs, DW_SR_MII_MMD_CTRL, mmd_ctrl);
+out:
+	XPCSINFO("Brought up %s PCS link\n", phy_modes(interface));
+	return;
+err:
+	XPCSERR("Failed to bring up %s PCS link\n", phy_modes(interface));
+}
+
+static void qcom_xpcs_link_up_sgmii_2500basex(struct dw_xpcs_qcom *xpcs, int speed,
+					      int duplex, phy_interface_t interface)
 {
 	int mmd_ctrl, an_ctrl;
 	int ret = 0;
@@ -1029,6 +1090,103 @@ out:
 	return -EINVAL;
 }
 
+/* @brief XPCS link up function for USXGMII with AN interrupt enabled
+ * @param[in] xpcs qcom xpcs data
+ * @param[in] speed link speed
+ * @param[in] duplex full duplex or half duplex
+ * @param[in] interface phy interface
+ */
+static void qcom_xpcs_link_up_usxgmii_intr(struct dw_xpcs_qcom *xpcs, int speed,
+					   phy_interface_t interface)
+{
+	int mmd_ctrl;
+	int ret = 0;
+
+	// Disable C37 AN first
+	mmd_ctrl = qcom_xpcs_read(xpcs, DW_SR_MII_MMD_CTRL);
+	if (mmd_ctrl < 0)
+		goto err;
+	mmd_ctrl &= ~AN_CL37_EN;
+	ret = qcom_xpcs_write(xpcs, DW_SR_MII_MMD_CTRL, ret);
+
+	// Perform xpcs soft reset
+	ret = qcom_xpcs_read(xpcs, DW_VR_MII_PCS_DIG_CTRL1);
+	if (ret < 0)
+		goto err;
+	ret = qcom_xpcs_write(xpcs, DW_VR_MII_PCS_DIG_CTRL1, ret | SOFT_RST);
+
+	mmd_ctrl = qcom_xpcs_poll_reset(xpcs, DW_VR_MII_PCS_DIG_CTRL1, SOFT_RST);
+	if (mmd_ctrl < 0) {
+		XPCSERR("Failed to reset SOFT_RST\n");
+		goto err;
+	}
+
+	// Program VR_MII_AN_CTRL to enable AN complete interrupt, PHY_SIDE
+	ret = qcom_xpcs_read(xpcs, DW_VR_MII_AN_CTRL);
+	if (ret < 0)
+		goto err;
+	ret |= DW_VR_MII_AN_INTR_EN;
+	ret |= DW_VR_MII_TX_CONFIG_PHY_SIDE << DW_VR_MII_AN_CTRL_TX_CONFIG_SHIFT;
+	ret |= DW_VR_MII_SGMII_LINK_STS;
+	qcom_xpcs_write(xpcs, DW_VR_MII_AN_CTRL, ret);
+
+	// Configure link timer
+	ret = qcom_xpcs_write(xpcs, DW_VR_MII_LINK_TIMER_CTRL, LINK_TIMER_USXGMII);
+
+	ret = qcom_xpcs_read(xpcs, DW_VR_MII_DIG_CTRL1);
+	if (ret < 0)
+		goto err;
+	ret |= CL37_TMR_OVR_RIDE;
+	ret = qcom_xpcs_write(xpcs, DW_VR_MII_DIG_CTRL1, ret);
+
+	mmd_ctrl = qcom_xpcs_read(xpcs, DW_SR_MII_MMD_CTRL);
+	if (mmd_ctrl < 0)
+		goto err;
+
+	mmd_ctrl &= ~DW_USXGMII_SS_MASK;
+	switch (speed) {
+	case SPEED_10000:
+		mmd_ctrl |= DW_USXGMII_10000;
+		XPCSINFO("Enabling 10Gbps-USXGMII\n");
+		break;
+	case SPEED_5000:
+		mmd_ctrl |= DW_USXGMII_5000;
+		XPCSINFO("Enabling 5Gbps-USXGMII\n");
+		break;
+	case SPEED_2500:
+		mmd_ctrl |= DW_GMII_2500;
+		XPCSINFO("Enabling 2.5Gbps-USXGMII\n");
+		break;
+	case SPEED_1000:
+		mmd_ctrl |= DW_GMII_1000;
+		XPCSINFO("Enabling 1Gbps-USXGMII\n");
+		break;
+	case SPEED_100:
+		mmd_ctrl |= DW_GMII_100;
+		XPCSINFO("Enabling 100Mbps-USXGMII\n");
+		break;
+	case SPEED_10:
+		XPCSINFO("Enabling 10Mbps-USXGMII\n");
+		break;
+	default:
+		XPCSERR("Invalid speed mode selected\n");
+		return;
+	}
+	mmd_ctrl = qcom_xpcs_write(xpcs, DW_SR_MII_MMD_CTRL, mmd_ctrl);
+
+	//Enable c37 autoneg
+	ret = qcom_xpcs_read(xpcs, DW_SR_MII_MMD_CTRL);
+	if (ret < 0)
+		goto err;
+	ret |= AN_CL37_EN;
+	ret = qcom_xpcs_write(xpcs, DW_SR_MII_MMD_CTRL, ret);
+
+	XPCSINFO("Brought up %s PCS link\n", phy_modes(interface));
+	return;
+err:
+	XPCSERR("Failed to bring up %s PCS link\n", phy_modes(interface));
+}
+
 void qcom_xpcs_link_up_usxgmii(struct dw_xpcs_qcom *xpcs, int speed, phy_interface_t interface)
 {
 	int mmd_ctrl;
@@ -1144,17 +1302,65 @@ read_err:
 	XPCSERR("Failed to read register\n");
 }
 
-/* USXGMII: Return early if interrupt was enabled.
+/* @brief link up function if PCS interrupt is enabled
+ * This function is to avoid the qcom_xpcs_link_up to be called again by stmmac platform driver
+ * when PCS interrupt is enabled.
+ *
+ * @param[in] pcs phylink pcs
+ * @param[in] interface phy interface
+ * @param[in] speed link speed
+ * @param[in] duplex full duplex or half duplex
+ */
+void qcom_xpcs_configure_intr(struct phylink_pcs *pcs, phy_interface_t interface,
+			      int speed, int duplex)
+{
+	struct dw_xpcs_qcom *xpcs = phylink_pcs_to_xpcs(pcs);
+	int ret;
+
+	switch (interface) {
+	case PHY_INTERFACE_MODE_2500BASEX:
+	case PHY_INTERFACE_MODE_SGMII:
+		ret = qcom_xpcs_select_mode(xpcs, interface);
+		if (ret < 0) {
+			XPCSERR("Failed to select %s mode\n", phy_modes(interface));
+			break;
+		}
+		qcom_xpcs_link_up_sgmii_2500basex_intr(xpcs, speed, duplex, interface);
+		break;
+	case PHY_INTERFACE_MODE_5GBASER:
+	case PHY_INTERFACE_MODE_USXGMII:
+		ret = qcom_xpcs_select_mode(xpcs, interface);
+		if (ret < 0) {
+			XPCSERR("Failed to select %s mode\n", phy_modes(interface));
+			break;
+		}
+		qcom_xpcs_link_up_usxgmii_intr(xpcs, speed, interface);
+		break;
+	default:
+		XPCSERR("Invalid MII mode: %s\n", phy_modes(interface));
+		return;
+	}
+#ifdef CONFIG_MSM_BOOT_TIME_MARKER
+	update_marker("M - Ethernet XPCS ready - sys side link up rcvd");
+#endif
+}
+EXPORT_SYMBOL_GPL(qcom_xpcs_configure_intr);
+
+/* USXGMII: Return early if interrupt was enabled for mac2mac.
  * Autonegotiation ISR will set speed and duplex instead.
  * SGMII: For 2.5Gbps, let ISR do NOP since SGMII+ not supported in
  * registers for CL37. qcom_xpcs_link_up_sgmii will take care of
  * setting 2.5Gbps.
+ * 2500BaseX: Doesn't support AN interrupt, do regular link up for mac2mac.
  */
 void qcom_xpcs_link_up(struct phylink_pcs *pcs, unsigned int mode,
 		  phy_interface_t interface, int speed, int duplex)
 {
 	struct dw_xpcs_qcom *xpcs = phylink_pcs_to_xpcs(pcs);
 
+	if (xpcs->fixed_phy_mode && interface != PHY_INTERFACE_MODE_2500BASEX &&
+	    !(speed == SPEED_2500 && interface == PHY_INTERFACE_MODE_SGMII))
+		return;
 	switch (interface) {
 	case PHY_INTERFACE_MODE_2500BASEX:
 	case PHY_INTERFACE_MODE_SGMII:
