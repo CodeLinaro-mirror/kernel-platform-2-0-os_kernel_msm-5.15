@@ -294,11 +294,9 @@ static int __init dm_init_init(void)
 
 	for (i = 0; i < ARRAY_SIZE(waitfor); i++) {
 		if (waitfor[i]) {
-			dev_t dev;
-
 			DMINFO("waiting for device %s ...", waitfor[i]);
-			while ((dev =  name_to_dev_t(waitfor[i]) != 0))
-				fsleep(5000);
+			while (!dm_get_dev_t(waitfor[i]))
+				msleep(5);
 		}
 	}
 
