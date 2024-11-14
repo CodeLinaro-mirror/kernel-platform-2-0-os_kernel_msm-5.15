@@ -5075,7 +5075,7 @@ static int fastrpc_mmap_dump(struct fastrpc_mmap *map, struct fastrpc_file *fl, 
 						match->size, match->flags, 0);
 			else {
 				pr_err("Cannot communicate with DSP, ADSP is down\n");
-				fastrpc_mmap_add(match);
+				fastrpc_mmap_add_global(match);
 			}
 		}
 		if (err)
