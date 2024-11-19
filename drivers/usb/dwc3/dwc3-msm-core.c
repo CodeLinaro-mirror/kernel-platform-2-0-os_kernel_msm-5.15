@@ -55,10 +55,6 @@
 #include "xhci.h"
 #include "debug-ipc.h"
 
-#ifdef CONFIG_MSM_BOOT_TIME_MARKER
-#include <soc/qcom/boot_stats.h>
-#endif
-
 #define NUM_LOG_PAGES   12
 #define DWC3_MINIDUMP	0x10000
 
@@ -324,11 +320,8 @@ struct dwc3_msm_req_complete {
 
 enum dwc3_drd_state {
 	DRD_STATE_UNDEFINED = 0,
-
 	DRD_STATE_IDLE,
 	DRD_STATE_PERIPHERAL,
-	DRD_STATE_PERIPHERAL_SUSPEND,
-
 	DRD_STATE_HOST,
 };
 
@@ -336,7 +329,6 @@ static const char *const state_names[] = {
 	[DRD_STATE_UNDEFINED] = "undefined",
 	[DRD_STATE_IDLE] = "idle",
 	[DRD_STATE_PERIPHERAL] = "peripheral",
-	[DRD_STATE_PERIPHERAL_SUSPEND] = "peripheral_suspend",
 	[DRD_STATE_HOST] = "host",
 };
 
@@ -4106,20 +4098,6 @@ static int dwc3_msm_suspend(struct dwc3_msm *mdwc, bool force_power_collapse,
 			}
 		}
 
-		/*
-		 * Check if device is not in CONFIGURED state
-		 * then check controller state of L2 and break
-		 * LPM sequence. Check this for device bus suspend case.
-		 */
-		if ((mdwc->dr_mode == USB_DR_MODE_OTG &&
-				mdwc->drd_state == DRD_STATE_PERIPHERAL_SUSPEND) &&
-				(dwc->gadget->state != USB_STATE_CONFIGURED)) {
-			pr_err("%s(): Trying to go in LPM with state:%d\n",
-						__func__, dwc->gadget->state);
-			pr_err("%s(): LPM is not performed.\n", __func__);
-			mutex_unlock(&mdwc->suspend_resume_mutex);
-			return -EBUSY;
-		}
 	}
 
 	if (!mdwc->vbus_active && mdwc->dr_mode == USB_DR_MODE_OTG &&
@@ -4662,13 +4640,6 @@ static irqreturn_t msm_dwc3_pwr_irq(int irq, void *data)
 	struct dwc3_msm *mdwc = data;
 
 	dev_dbg(mdwc->dev, "%s received\n", __func__);
-
-	if (mdwc->drd_state == DRD_STATE_PERIPHERAL_SUSPEND) {
-		dev_dbg(mdwc->dev, "USB Resume start\n");
-#ifdef CONFIG_MSM_BOOT_TIME_MARKER
-	update_marker("M - USB device resume started");
-#endif
-	}
 
 	/*
 	 * When in Low Power Mode, can't read PWR_EVNT_IRQ_STAT_REG to acertain
@@ -7576,53 +7547,12 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 			dbg_event(0xFF, "!BSV psync",
 				atomic_read(&mdwc->dev->power.usage_count));
 			work = true;
-		} else if (test_bit(B_SUSPEND, &mdwc->inputs) &&
-			test_bit(B_SESS_VLD, &mdwc->inputs)) {
-			dev_dbg(mdwc->dev, "BPER bsv && susp\n");
-			mdwc->drd_state = DRD_STATE_PERIPHERAL_SUSPEND;
-			/*
-			 * Decrement pm usage count upon bus suspend.
-			 * Count was incremented either upon cable
-			 * connect in DRD_STATE_IDLE or host
-			 * initiated resume after bus suspend in
-			 * DRD_STATE_PERIPHERAL_SUSPEND state
-			 */
-			pm_runtime_mark_last_busy(mdwc->dev);
-			pm_runtime_put_autosuspend(mdwc->dev);
-			dbg_event(0xFF, "SUSP put",
-				atomic_read(&mdwc->dev->power.usage_count));
 		} else if (test_and_clear_bit(CONN_DONE, &mdwc->inputs) && mdwc->wcd_usbss) {
 			if (dwc->gadget->speed >= USB_SPEED_SUPER)
 				wcd_usbss_dpdm_switch_update(false, false);
 			else
 				wcd_usbss_dpdm_switch_update(true,
 					dwc->gadget->speed == USB_SPEED_HIGH);
-		}
-		break;
-
-	case DRD_STATE_PERIPHERAL_SUSPEND:
-		if (!test_bit(B_SESS_VLD, &mdwc->inputs)) {
-			dev_dbg(mdwc->dev, "BSUSP: !bsv\n");
-			mdwc->drd_state = DRD_STATE_IDLE;
-			dwc3_otg_start_peripheral(mdwc, 0);
-		} else if (!test_bit(B_SUSPEND, &mdwc->inputs)) {
-			dev_dbg(mdwc->dev, "BSUSP !susp\n");
-			mdwc->drd_state = DRD_STATE_PERIPHERAL;
-			/*
-			 * Increment pm usage count upon host
-			 * initiated resume. Count was decremented
-			 * upon bus suspend in
-			 * DRD_STATE_PERIPHERAL state.
-			 */
-			ret = pm_runtime_resume_and_get(mdwc->dev);
-			if (ret < 0) {
-				dev_err(mdwc->dev, "%s: pm_runtime_resume_and_get failed\n"
-						, __func__);
-				pm_runtime_set_suspended(mdwc->dev);
-				break;
-			}
-			dbg_event(0xFF, "!SUSP gsync",
-				atomic_read(&mdwc->dev->power.usage_count));
 		}
 		break;
 
@@ -7737,14 +7667,6 @@ static int dwc3_msm_pm_resume(struct device *dev)
 	dbg_event(0xFF, "PM Res", 0);
 
 	atomic_set(&mdwc->pm_suspended, 0);
-
-	if (atomic_read(&mdwc->in_lpm) &&
-			mdwc->drd_state == DRD_STATE_PERIPHERAL_SUSPEND) {
-		dev_dbg(mdwc->dev, "USB Resume start\n");
-#ifdef CONFIG_MSM_BOOT_TIME_MARKER
-	update_marker("M - USB device resume started");
-#endif
-	}
 
 	/*
 	 * The expectation is to let DWC3 core complete determine if resume is needed.
