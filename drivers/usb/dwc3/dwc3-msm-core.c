@@ -3684,6 +3684,7 @@ static void dwc3_set_phy_speed_flags(struct dwc3_msm *mdwc)
 		return;
 
 	dwc = platform_get_drvdata(mdwc->dwc3);
+	reg = dwc3_msm_read_reg(mdwc->base, DWC3_DSTS);
 
 	mdwc->hs_phy->flags &= ~(PHY_HSFS_MODE | PHY_LS_MODE);
 	if (mdwc->in_host_mode) {
@@ -3699,7 +3700,7 @@ static void dwc3_set_phy_speed_flags(struct dwc3_msm *mdwc)
 					mdwc->hs_phy->flags |= PHY_LS_MODE;
 			}
 		}
-	} else if (mdwc->drd_state == DRD_STATE_PERIPHERAL_SUSPEND) {
+	} else if (mdwc->in_device_mode && (DWC3_DSTS_USBLNKST(reg) == DWC3_LINK_STATE_U3)) {
 		if (dwc->gadget->speed == USB_SPEED_HIGH ||
 			dwc->gadget->speed == USB_SPEED_FULL)
 			mdwc->hs_phy->flags |= PHY_HSFS_MODE;
