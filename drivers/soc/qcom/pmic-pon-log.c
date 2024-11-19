@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2020-2021, The Linux Foundation. All rights reserved. */
-/* Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved. */
+/* Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved. */
 
 #include <linux/err.h>
 #include <linux/ipc_logging.h>
@@ -179,7 +179,7 @@ static const struct pmic_pon_trigger_mapping pmic_pon_pon_trigger_map[] = {
 	{0x0621, "RTC_ALARM"},
 	{0x0640, "SMPL"},
 	/* PMX75 USB PON trigger */
-	{0x18A0, "USB_CHARGER"},
+	{0x18A0, "CBLPWR"},
 	{0x18C0, "PMIC_SID1_GPIO5"},
 	/* PMI632 USB PON trigger */
 	{0x2763, "USB_CHARGER"},
