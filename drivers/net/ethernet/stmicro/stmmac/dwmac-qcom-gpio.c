@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
+
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
@@ -18,6 +20,8 @@
 #define EMAC_VREG_RGMII_IO_PADS_NAME "vreg_rgmii_io_pads"
 #define EMAC_VREG_A_SGMII_1P2_NAME "vreg_a_sgmii_1p2"
 #define EMAC_VREG_A_SGMII_0P9_NAME "vreg_a_sgmii_0p9"
+#define EMAC_RGMII_TXC_SLEEP_NAME "dev-emac0_pin_rgmii_txc_sleep"
+#define EMAC_RGMII_TXC_NAME "dev-emac0_pin_rgmii_txc"
 
 #if IS_ENABLED(CONFIG_ETHQOS_QCOM_VER4)
 static u32 A_SGMII_1P2_MAX_VOLT = 1200000;
@@ -92,6 +96,66 @@ int ethqos_enable_serdes_consumers(struct qcom_ethqos *ethqos)
 	return ret;
 }
 EXPORT_SYMBOL(ethqos_enable_serdes_consumers);
+
+int ethqos_set_rgmii_txc_gpio_sleep(struct qcom_ethqos *ethqos)
+{
+	int ret = 0;
+	struct pinctrl *pinctrl;
+	struct pinctrl_state *pinctrl_state;
+
+	pinctrl = devm_pinctrl_get(&ethqos->pdev->dev);
+	if (IS_ERR_OR_NULL(pinctrl)) {
+		ret = PTR_ERR(pinctrl);
+		ETHQOSERR("Failed to get pinctrl, err = %d\n", ret);
+		return ret;
+	}
+
+	pinctrl_state = pinctrl_lookup_state(pinctrl, EMAC_RGMII_TXC_SLEEP_NAME);
+	if (IS_ERR_OR_NULL(pinctrl_state)) {
+		ret = PTR_ERR(pinctrl_state);
+		ETHQOSERR("lookup_state %s failed %d\n", EMAC_RGMII_TXC_SLEEP_NAME, ret);
+		return ret;
+	}
+
+	ret = pinctrl_select_state(pinctrl, pinctrl_state);
+	if (ret) {
+		ETHQOSERR("select_state %s failed %d\n", EMAC_RGMII_TXC_SLEEP_NAME, ret);
+		return ret;
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(ethqos_set_rgmii_txc_gpio_sleep);
+
+int ethqos_set_rgmii_txc_gpio_active(struct qcom_ethqos *ethqos)
+{
+	int ret = 0;
+	struct pinctrl *pinctrl;
+	struct pinctrl_state *pinctrl_state;
+
+	pinctrl = devm_pinctrl_get(&ethqos->pdev->dev);
+	if (IS_ERR_OR_NULL(pinctrl)) {
+		ret = PTR_ERR(pinctrl);
+		ETHQOSERR("Failed to get pinctrl, err = %d\n", ret);
+		return ret;
+	}
+
+	pinctrl_state = pinctrl_lookup_state(pinctrl, EMAC_RGMII_TXC_NAME);
+	if (IS_ERR_OR_NULL(pinctrl_state)) {
+		ret = PTR_ERR(pinctrl_state);
+		ETHQOSERR("lookup_state %s failed %d\n", EMAC_RGMII_TXC_NAME, ret);
+		return ret;
+	}
+
+	ret = pinctrl_select_state(pinctrl, pinctrl_state);
+	if (ret) {
+		ETHQOSERR("select_state %s failed %d\n", EMAC_RGMII_TXC_NAME, ret);
+		return ret;
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(ethqos_set_rgmii_txc_gpio_active);
 
 int ethqos_disable_serdes_consumers(struct qcom_ethqos *ethqos)
 {
@@ -543,4 +607,4 @@ gpio_error:
 }
 EXPORT_SYMBOL(ethqos_init_gpio);
 
-MODULE_LICENSE("GPL v2");
+MODULE_LICENSE("GPL");

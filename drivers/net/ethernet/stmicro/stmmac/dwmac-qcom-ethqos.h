@@ -638,6 +638,8 @@ int qcom_ethqos_bring_up_phy_if(struct device *dev, bool client_mode);
 int ethqos_init_sgmii_regulators(struct qcom_ethqos *ethqos);
 int ethqos_enable_serdes_consumers(struct qcom_ethqos *ethqos);
 int ethqos_disable_serdes_consumers(struct qcom_ethqos *ethqos);
+int ethqos_set_rgmii_txc_gpio_sleep(struct qcom_ethqos *ethqos);
+int ethqos_set_rgmii_txc_gpio_active(struct qcom_ethqos *ethqos);
 int ethqos_init_regulators(struct qcom_ethqos *ethqos);
 void ethqos_disable_regulators(struct qcom_ethqos *ethqos);
 int ethqos_init_gpio(struct qcom_ethqos *ethqos);
