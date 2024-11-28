@@ -703,6 +703,9 @@ static int set_ethernet_interface(char *eth_intf)
 	} else if (!strcmp("2500base", eth_intf)) {
 		mparams.eth_intf =  PHY_INTERFACE_MODE_2500BASEX;
 		mparams.is_valid_eth_intf = true;
+	} else if (!strcmp("5gbase-r", eth_intf)) {
+		mparams.eth_intf =  PHY_INTERFACE_MODE_5GBASER;
+		mparams.is_valid_eth_intf = true;
 	} else {
 		ETHQOSERR("Invalid Eth interface programmed: %s\n", eth_intf);
 		return 1;
