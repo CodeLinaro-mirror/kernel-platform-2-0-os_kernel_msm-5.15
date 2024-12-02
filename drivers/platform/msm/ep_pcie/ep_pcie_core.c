@@ -4342,7 +4342,12 @@ static int ep_pcie_probe(struct platform_device *pdev)
 		EP_PCIE_DBG(&ep_pcie_dev,
 			"PCIe V%d: boot_config is not PCIe\n",
 			ep_pcie_dev.rev);
-		goto res_failure;
+		/*
+		 * For non-pcie boot config, instead of failing probe, simply return
+		 * success (without proceeding for any further initialization)
+		 * to satisfy GCC sync_state framework requirements.
+		 */
+		return 0;
 	}
 
 	ret = of_property_read_u32((&pdev->dev)->of_node,
