@@ -100,4 +100,15 @@ config QRTR_ETHERNET
 	  IPC router in EAP+MDM mode. This has an out-of-tree dependency on
 	  ethernet adaption layer. Ethernet based ipcrouter is capable of
 	  handling byte stream data.
+
+config QRTR_WAKEUP_INFO
+	tristate "QRTR Wakeup info driver"
+	help
+	  Say Y here to support character driver that helps store information of
+	  the packet that caused wakeup. This will expose device node for
+	  userspace client to retrieve information like service-id, message-id,
+	  client-pid, client process name, type_of_message, src_node, dest_node.
+	  Number of wakeup entries to be stored can be configured through a sysfs
+	  node.
+
 endif # QRTR

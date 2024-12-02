@@ -18,3 +18,5 @@ obj-$(CONFIG_QRTR_BPF_FILTER) += qrtr-bpf_service.o
 qrtr-bpf_service-y	:= bpf_service.o
 obj-$(CONFIG_QRTR_ETHERNET) += qrtr-ethernet.o
 qrtr-ethernet-y	:= ethernet.o
+obj-$(CONFIG_QRTR_WAKEUP_INFO) += qrtr-wakeup-info.o
+qrtr-wakeup-info-y	:= qrtr_wakeup_info.o
