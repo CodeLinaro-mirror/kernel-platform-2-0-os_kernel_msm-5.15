@@ -5412,7 +5412,6 @@ void mhi_dev_resume_init_with_link_up(struct ep_pcie_notify *notify)
 		return;
 	}
 	queue_work(mhi->pcie_event_wq, &mhi->pcie_event);
-	mhi_uci_init();
 }
 
 static void mhi_dev_pcie_handle_event(struct work_struct *work)
@@ -5421,6 +5420,7 @@ static void mhi_dev_pcie_handle_event(struct work_struct *work)
 	enum ep_pcie_link_status link_state;
 	struct mhi_dev *mhi = container_of(work, struct mhi_dev, pcie_event);
 
+	mhi_uci_init();
 	if (!mhi_dma_fun_ops && !mhi->use_edma) {
 		/*
 		 * Register for linkup event if it is not registered in
