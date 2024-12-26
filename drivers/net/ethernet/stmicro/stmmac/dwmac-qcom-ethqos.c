@@ -3667,6 +3667,21 @@ static void ethqos_serdes_loopback(struct qcom_ethqos *ethqos, int speed, int co
 {
 	struct stmmac_priv *priv = qcom_ethqos_get_priv(ethqos);
 
+	if (IS_ERR_OR_NULL(priv)) {
+		ETHQOSERR("priv is NULL or Error\n");
+		return;
+	}
+
+	if (IS_ERR_OR_NULL(priv->dev)) {
+		ETHQOSERR("priv->dev is NULL or Error\n");
+		return;
+	}
+
+	if (IS_ERR_OR_NULL(priv->dev->phydev)) {
+		ETHQOSERR("priv->dev->phydev is NULL or Error\n");
+		return;
+	}
+
 	qcom_xpcs_link_up(&priv->hw->qxpcs->pcs, 1, priv->plat->interface,
 			  speed, priv->dev->phydev->duplex);
 
