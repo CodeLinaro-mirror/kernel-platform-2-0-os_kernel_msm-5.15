@@ -317,6 +317,7 @@ struct plat_stmmacenet_data {
 	bool int_snapshot_en;
 	bool ext_snapshot_en;
 	bool multi_msi_en;
+	bool tm_u5g_en;
 	int msi_mac_vec;
 	int msi_wol_vec;
 	int msi_lpi_vec;
