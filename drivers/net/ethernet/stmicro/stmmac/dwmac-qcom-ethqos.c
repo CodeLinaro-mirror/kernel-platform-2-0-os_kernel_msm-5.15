@@ -407,6 +407,18 @@ u16 dwmac_qcom_select_queue(struct net_device *dev,
 	struct qcom_ethqos *ethqos = (struct qcom_ethqos *)priv->plat->bsp_priv;
 	s8 eprio;
 	int i = 0, tc_prio = 0;
+
+	if (priv->plat->tc_select_queue) {
+		if (skb && skb->priority) {
+			txqueue_select =  netdev_pick_tx(dev, skb, NULL) %
+					  dev->real_num_tx_queues;
+		}
+
+		if (ethqos->ipa_enabled && txqueue_select == 0)
+			txqueue_select = 1;
+
+		return txqueue_select;
+	}
 	/* Retrieve ETH type */
 	eth_type = dwmac_qcom_get_eth_type(skb->data);
 
@@ -4954,6 +4966,51 @@ static DEVICE_ATTR(ipc_stmmac_log_low, ETHQOS_SYSFS_DEV_ATTR_PERMS,
 		   show_ipc_stmmac_log_ctxt_low,
 		   store_ipc_stmmac_log_ctxt_low);
 
+static ssize_t show_tc_queue_select_sysfs(struct device *dev,
+					  struct device_attribute *attr, char *user_buf)
+{
+	return 0;
+}
+
+static ssize_t store_tc_queue_select_sysfs(struct device *dev, struct device_attribute *attr,
+					   const char *user_buf, size_t count)
+{
+	struct device *parent = NULL;
+	struct net_device *netdev;
+	struct stmmac_priv *priv;
+	int tmp;
+
+	parent = kobj_to_dev(dev->kobj.parent);
+	netdev = to_net_dev(parent);
+	if (!netdev) {
+		pr_err("netdev is NULL\n");
+		return -EINVAL;
+	}
+
+	priv = netdev_priv(netdev);
+	if (!priv) {
+		pr_err("priv is NULL\n");
+		return -EINVAL;
+	}
+
+	if (sscanf(user_buf, "%du", &tmp) < 0) {
+		ETHQOSERR("sscanf failed\n");
+		return -EINVAL;
+	}
+
+	if (tmp) {
+		ETHQOSINFO(" enabling TC based queue selection");
+		priv->plat->tc_select_queue = true;
+	} else {
+		ETHQOSINFO(" disabling TC based queue selection");
+		priv->plat->tc_select_queue = false;
+	}
+	return count;
+}
+
+static DEVICE_ATTR(tc_queue_select, ETHQOS_SYSFS_DEV_ATTR_PERMS,
+		   show_tc_queue_select_sysfs, store_tc_queue_select_sysfs);
+
 static int ethqos_create_sysfs_nodes(struct qcom_ethqos *ethqos)
 {
 	struct stmmac_priv *priv;
@@ -5014,6 +5071,12 @@ static int ethqos_create_sysfs_nodes(struct qcom_ethqos *ethqos)
 	ret = sysfs_create_file(ethqos->sysfs_kobj, &dev_attr_nw_loopback_enable.attr);
 	if (ret) {
 		ETHQOSERR("unable to create sysfs nw_loopback_enable node\n");
+		goto fail;
+	}
+
+	ret = sysfs_create_file(ethqos->sysfs_kobj, &dev_attr_tc_queue_select.attr);
+	if (ret) {
+		ETHQOSERR("unable to create sysfs tc_queue_select node\n");
 		goto fail;
 	}
 
