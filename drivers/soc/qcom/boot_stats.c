@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2013-2019, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
@@ -631,7 +631,7 @@ static int __init boot_stats_init(void)
 
 	return 0;
 }
-module_init(boot_stats_init);
+arch_initcall(boot_stats_init);
 
 static void __exit boot_stats_exit(void)
 {
