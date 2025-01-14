@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2019, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/err.h>
@@ -18,6 +18,11 @@
 #include <linux/reset_reason.h>
 #include <linux/slab.h>
 #endif
+#ifdef CONFIG_POWER_RESET_QCOM_REBOOT_REASON_BOOTPARAM
+#include <linux/panic_notifier.h>
+#endif
+
+#define PON_REASON_PANIC	0x07
 
 struct qcom_reboot_reason {
 	struct device *dev;
@@ -29,6 +34,7 @@ struct qcom_reboot_reason {
 #endif
 #ifdef CONFIG_POWER_RESET_QCOM_REBOOT_REASON_BOOTPARAM
 	struct kobject bootparam_kobj;
+	struct notifier_block panic_nb;
 #endif
 };
 
@@ -117,9 +123,13 @@ static struct attribute *qcom_reset_attrs[] = {
 static struct attribute_group qcom_reset_attr_group = {
 	.attrs = qcom_reset_attrs,
 };
+#endif
 
+#ifdef CONFIG_POWER_RESET_QCOM_STORE_RESET_REASON
 struct nvmem_cell *reset_reason_nvmem;
+#endif
 
+#ifdef CONFIG_POWER_RESET_QCOM_RESET_REASON
 static int reset_reason_sysfs(struct qcom_reboot_reason *reboot)
 {
 	int ret;
@@ -142,7 +152,6 @@ static int reset_reason_sysfs(struct qcom_reboot_reason *reboot)
 		return ret;
 	}
 
-	reset_reason_nvmem = reboot->nvmem_cell;
 	buf = nvmem_cell_read(reboot->nvmem_cell, &len);
 	if (IS_ERR(buf))
 		return PTR_ERR(buf);
@@ -153,21 +162,12 @@ static int reset_reason_sysfs(struct qcom_reboot_reason *reboot)
 
 	return 0;
 }
-
-void store_reset_reason(char *cmd, struct nvmem_cell *nvmem_cell)
-#else
-static void store_reset_reason(char *cmd, struct nvmem_cell *nvmem_cell)
 #endif
+
+static void write_reset_reason(char *cmd, struct nvmem_cell *nvmem_cell)
 {
 	struct poweroff_reason *reason;
 
-#ifdef CONFIG_POWER_RESET_QCOM_RESET_REASON
-	if (!reset_reason_nvmem)
-		return;
-
-	if (!nvmem_cell)
-		nvmem_cell = reset_reason_nvmem;
-#endif
 	for (reason = reasons; reason->cmd; reason++) {
 		if (!strcmp(cmd, reason->cmd)) {
 			nvmem_cell_write(nvmem_cell,
@@ -177,7 +177,18 @@ static void store_reset_reason(char *cmd, struct nvmem_cell *nvmem_cell)
 		}
 	}
 }
-#ifdef CONFIG_POWER_RESET_QCOM_RESET_REASON
+
+#ifdef CONFIG_POWER_RESET_QCOM_STORE_RESET_REASON
+void store_reset_reason(char *cmd, struct nvmem_cell *nvmem_cell)
+{
+	if (!reset_reason_nvmem || !cmd)
+		return;
+
+	if (!nvmem_cell)
+		nvmem_cell = reset_reason_nvmem;
+
+	write_reset_reason(cmd, nvmem_cell);
+}
 EXPORT_SYMBOL_GPL(store_reset_reason);
 #endif
 
@@ -245,10 +256,26 @@ static int qcom_reboot_reason_reboot(struct notifier_block *this,
 	if (!cmd)
 		return NOTIFY_OK;
 
-	store_reset_reason(cmd, reboot->nvmem_cell);
+	write_reset_reason(cmd, reboot->nvmem_cell);
 
 	return NOTIFY_OK;
 }
+
+#ifdef CONFIG_POWER_RESET_QCOM_REBOOT_REASON_BOOTPARAM
+static int qcom_reboot_reason_panic(struct notifier_block *this,
+		unsigned long event, void *ptr)
+{
+	struct qcom_reboot_reason *reboot = container_of(this,
+			struct qcom_reboot_reason, panic_nb);
+	unsigned int pon_reason = PON_REASON_PANIC;
+
+	nvmem_cell_write(reboot->nvmem_cell,
+			&pon_reason,
+			sizeof(pon_reason));
+
+	return 0;
+}
+#endif
 
 static int qcom_reboot_reason_probe(struct platform_device *pdev)
 {
@@ -265,11 +292,17 @@ static int qcom_reboot_reason_probe(struct platform_device *pdev)
 	if (IS_ERR(reboot->nvmem_cell))
 		return PTR_ERR(reboot->nvmem_cell);
 
+#ifdef CONFIG_POWER_RESET_QCOM_STORE_RESET_REASON
+	reset_reason_nvmem = reboot->nvmem_cell;
+#endif
 #ifdef CONFIG_POWER_RESET_QCOM_RESET_REASON
 	reset_reason_sysfs(reboot);
 #endif
 #ifdef CONFIG_POWER_RESET_QCOM_REBOOT_REASON_BOOTPARAM
 	bootparam_sysfs(reboot);
+	reboot->panic_nb.notifier_call = qcom_reboot_reason_panic;
+	reboot->panic_nb.priority = 255;
+	atomic_notifier_chain_register(&panic_notifier_list, &reboot->panic_nb);
 #endif
 	reboot->reboot_nb.notifier_call = qcom_reboot_reason_reboot;
 	reboot->reboot_nb.priority = 255;
@@ -285,7 +318,9 @@ static int qcom_reboot_reason_remove(struct platform_device *pdev)
 	struct qcom_reboot_reason *reboot = platform_get_drvdata(pdev);
 
 	unregister_reboot_notifier(&reboot->reboot_nb);
-
+#ifdef CONFIG_POWER_RESET_QCOM_REBOOT_REASON_BOOTPARAM
+	atomic_notifier_chain_unregister(&panic_notifier_list, &reboot->panic_nb);
+#endif
 	return 0;
 }
 

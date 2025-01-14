@@ -166,6 +166,7 @@ config POWER_RESET_QCOM_RESET_REASON
 	bool "MSM reset resaons operations"
 	depends on ARCH_QCOM
 	depends on POWER_RESET_QCOM_REBOOT_REASON
+	select POWER_RESET_QCOM_STORE_RESET_REASON
 	help
 	  This feature is enabled when reboot reason is needed in the
 	  userspace. Sysfs path /sys/kernel/reset_reason/reset_reason
@@ -176,11 +177,22 @@ config POWER_RESET_QCOM_RESET_REASON
 config POWER_RESET_QCOM_REBOOT_REASON_BOOTPARAM
 	bool "MSM reboot reason boot parameter"
 	depends on POWER_RESET_QCOM_REBOOT_REASON
+	select POWER_RESET_QCOM_STORE_RESET_REASON
 	help
 	  This feature adds a command line parameter 'qcom-reboot-reason.reason'
 	  which can be used to pass the reboot reason on bootup. This allows
 	  the driver to access the reboot reason on targets where the bootloader
 	  clears the reason after reading it.
+
+config POWER_RESET_QCOM_STORE_RESET_REASON
+	bool "MSM store reset reason"
+	depends on POWER_RESET_QCOM_REBOOT_REASON
+	help
+	  The reboot reason feature causes a reason code to be written to
+	  non-volatile memory upon reboot command, allowing the bootloader
+	  to act accordingly. The store reset reason feature further extends
+	  this by exporting an API to other drivers that trigger a restart
+	  without reboot syscall to store a reason to the same location.
 
 config POWER_RESET_QCOM_DOWNLOAD_MODE_COMPRESS
 	bool "MSM compression support for fulldump"
