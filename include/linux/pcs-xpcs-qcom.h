@@ -27,6 +27,7 @@ struct dw_xpcs_qcom {
 	bool intr_en;
 	bool sgmii_2p5g_en;
 	bool fixed_phy_mode;
+	bool c37_an_en;
 };
 
 enum dw_xpcs_err_type {
@@ -44,6 +45,8 @@ int qcom_xpcs_get_an_mode(struct dw_xpcs_qcom *xpcs,
 void qcom_xpcs_link_up(struct phylink_pcs *pcs, unsigned int mode,
 		       phy_interface_t interface, int speed,
 		       int duplex);
+void qcom_xpcs_configure_intr(struct phylink_pcs *pcs, phy_interface_t interface,
+			    int speed, int duplex);
 void qcom_xpcs_validate(struct dw_xpcs_qcom *xpcs, unsigned long *supported,
 		   struct phylink_link_state *state);
 int qcom_xpcs_config_eee(struct dw_xpcs_qcom *xpcs, int mult_fact_100ns,
@@ -56,6 +59,7 @@ const struct xpcs_compat *xpcs_find_compat(const struct xpcs_id *id,
 int qcom_xpcs_serdes_loopback(struct dw_xpcs_qcom *xpcs, bool on);
 int qcom_xpcs_pcs_loopback(struct dw_xpcs_qcom *xpcs, bool on);
 int qcom_xpcs_check_aneg_ioc(struct dw_xpcs_qcom *xpcs, phy_interface_t interface);
+int qcom_xpcs_handle_an_intr(struct dw_xpcs_qcom *xpcs, phy_interface_t interface);
 int qcom_xpcs_intr_enable(struct dw_xpcs_qcom *xpcs);
 irqreturn_t ethqos_xpcs_isr(int irq, void *dev_data);
 int ethqos_xpcs_intr_config(struct net_device *ndev);
@@ -76,6 +80,11 @@ static inline int qcom_xpcs_get_an_mode(struct dw_xpcs_qcom *xpcs,
 static inline void qcom_xpcs_link_up(struct phylink_pcs *pcs, unsigned int mode,
 				     phy_interface_t interface, int speed,
 				     int duplex)
+{
+}
+
+static inline void qcom_xpcs_configure_intr(struct phylink_pcs *pcs, phy_interface_t interface,
+			    int speed, int duplex)
 {
 }
 
@@ -119,6 +128,11 @@ static inline int qcom_xpcs_pcs_loopback(struct dw_xpcs_qcom *xpcs, bool on)
 
 static inline int qcom_xpcs_check_aneg_ioc(struct dw_xpcs_qcom *xpcs,
 					   phy_interface_t interface)
+{
+	return -EINVAL;
+}
+
+static inline int qcom_xpcs_handle_an_intr(struct dw_xpcs_qcom *xpcs, phy_interface_t interface)
 {
 	return -EINVAL;
 }
