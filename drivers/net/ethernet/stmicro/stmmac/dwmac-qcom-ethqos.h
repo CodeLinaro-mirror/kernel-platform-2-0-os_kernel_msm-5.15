@@ -413,6 +413,9 @@ struct qcom_ethqos {
 	/* Work struct for handling phy interrupt */
 	struct work_struct emac_wol_work;
 
+	/* Work struct for handling pcs interrupt */
+	struct work_struct emac_pcs_work;
+
 	struct ethqos_emac_por *por;
 	unsigned int num_por;
 	unsigned int emac_ver;
@@ -666,6 +669,9 @@ void dwmac_qcom_program_avb_algorithm(struct stmmac_priv *priv,
 unsigned int dwmac_qcom_get_plat_tx_coal_frames(struct sk_buff *skb);
 int ethqos_init_pps(void *priv);
 unsigned int dwmac_qcom_get_eth_type(unsigned char *buf);
+bool is_c37_an_supported(struct stmmac_priv *priv);
+void ethqos_set_mac_speed_mode_duplex(struct stmmac_priv *priv, int speed,
+				      phy_interface_t interface, int duplex);
 
 #if IS_ENABLED(CONFIG_ETHQOS_QCOM_HOSTVM)
 void qcom_ethstate_update(struct plat_stmmacenet_data *plat, enum eth_state event);

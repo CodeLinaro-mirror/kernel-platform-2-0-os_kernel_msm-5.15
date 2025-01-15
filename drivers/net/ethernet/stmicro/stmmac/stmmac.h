@@ -329,6 +329,7 @@ struct stmmac_priv {
 	struct stmmac_channel channel[STMMAC_CH_MAX];
 
 	int speed;
+	int duplex;
 	unsigned int flow_ctrl;
 	unsigned int pause;
 	struct mii_bus *mii;

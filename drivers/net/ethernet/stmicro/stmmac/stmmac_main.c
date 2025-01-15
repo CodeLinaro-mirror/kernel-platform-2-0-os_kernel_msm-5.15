@@ -1446,6 +1446,7 @@ static void stmmac_mac_link_up(struct phylink_config *config,
 	}
 
 	priv->speed = speed;
+	priv->duplex = duplex;
 
 	if (!priv->plat->fixed_phy_mode &&
 	    priv->speed == SPEED_10 &&
@@ -1456,11 +1457,20 @@ static void stmmac_mac_link_up(struct phylink_config *config,
 		priv->mii->write(priv->mii, priv->plat->phy_addr, KSZ9131RNX_LBR, phy_data);
 	}
 
-	if (priv->plat->fix_mac_speed)
-		priv->plat->fix_mac_speed(priv->plat->bsp_priv, speed);
+	if (priv->plat->serdes_update_speed && priv->plat->fixed_phy_mode)
+		ret = priv->plat->serdes_update_speed(priv->plat->bsp_priv, speed);
 
-	if (priv->plat->xpcs_linkup)
-		priv->plat->xpcs_linkup(priv->plat->bsp_priv, speed);
+	/* PCS interrupt callback will configure mac (including, fix_max_speed,
+	 * stmmac_mac_flow_ctrl and set speed/duplex)
+	 * No need to configure mac again if using PCS interrupt.
+	 *
+	 * Note: 1. Interrupt mode is only enabled for mac2mac (but disabled in #2 speed/mode).
+	 *       2. SGMII 2.5G and 2500-BaseX doesn't support AN interrupt.
+	 */
+	if (priv->plat->fix_mac_speed &&
+	    (!priv->plat->fixed_phy_mode || !priv->hw->qxpcs->c37_an_en ||
+	     (priv->plat->fixed_phy_mode && !is_c37_an_supported(priv))))
+		priv->plat->fix_mac_speed(priv->plat->bsp_priv, speed);
 
 
 	if (!duplex)
@@ -1478,18 +1488,16 @@ static void stmmac_mac_link_up(struct phylink_config *config,
 	else
 		priv->flow_ctrl = FLOW_OFF;
 
-	stmmac_mac_flow_ctrl(priv, duplex);
+	if (priv->plat->xpcs_linkup)
+		priv->plat->xpcs_linkup(priv->plat->bsp_priv, speed);
 
+	if (!priv->plat->fixed_phy_mode || !priv->hw->qxpcs->c37_an_en ||
+	    (priv->plat->fixed_phy_mode && !is_c37_an_supported(priv))) {
+		stmmac_mac_flow_ctrl(priv, duplex);
 		writel(ctrl, priv->ioaddr + MAC_CTRL_REG);
-
-	if (priv->plat->fixed_phy_mode) {
-		priv->plat->mac2mac_link = true;
-		netdev_info(priv->dev,
-			    "mac2mac mode: Mac link up speed = %d\n",
-			    speed);
+		stmmac_mac_set(priv, priv->ioaddr, true);
 	}
 
-	stmmac_mac_set(priv, priv->ioaddr, true);
 	if (phy && priv->dma_cap.eee) {
 		priv->eee_active =
 			phy_init_eee(phy, !priv->plat->rx_clk_runs_in_lpi) >= 0;
@@ -1500,6 +1508,13 @@ static void stmmac_mac_link_up(struct phylink_config *config,
 
 	if (priv->dma_cap.fpesel)
 		stmmac_fpe_link_state_handle(priv, true);
+
+	if (priv->plat->fixed_phy_mode) {
+		priv->plat->mac2mac_link = true;
+		netdev_info(priv->dev,
+			    "mac2mac mode: Mac link up speed = %d\n",
+			    speed);
+	}
 
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
 	if (priv->plat->fixed_phy_mode && !priv->boot_kpi) {
