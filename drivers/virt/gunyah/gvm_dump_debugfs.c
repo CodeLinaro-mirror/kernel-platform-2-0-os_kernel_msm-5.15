@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
@@ -106,8 +106,12 @@ static int gvm_debugfs_release(struct inode *inode, struct file *file)
 	struct inode *in = file->f_inode;
 	struct gvm_dump_ctx *gvm_prv_ctx = (struct gvm_dump_ctx *)in->i_private;
 
+	mutex_lock(&gvm_prv_ctx->lock);
+
 	if (gvm_prv_ctx->mapped_addr)
 		iounmap(gvm_prv_ctx->mapped_addr);
+
+	mutex_unlock(&gvm_prv_ctx->lock);
 
 	return 0;
 }
@@ -121,7 +125,7 @@ static ssize_t gvm_debugfs_read(struct file *file, char __user *ubuf,
 
 	mutex_lock(&gvm_prv_ctx->lock);
 
-	if (gvm_prv_ctx->mapped_addr)
+	if (gvm_prv_ctx->mapped_addr && ubuf)
 		ret = simple_read_from_buffer(ubuf, count, ppos, gvm_prv_ctx->mapped_addr,
 						gvm_prv_ctx->dump_size);
 
