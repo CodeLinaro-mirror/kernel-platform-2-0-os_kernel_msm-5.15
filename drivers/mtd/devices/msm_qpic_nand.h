@@ -145,8 +145,8 @@
 #define MSM_NAND_READ_STATUS(info)          MSM_NAND_REG(info, 0x30044)
 #define MSM_NAND_READ_ID2(info)              MSM_NAND_REG(info, 0x30048)
 #define EXTENDED_FETCH_ID           BIT(19)
-#define MSM_NAND_DEV_CMD1(info)             MSM_NAND_REG(info, 0x300A4)
-#define MSM_NAND_DEV_CMD_VLD(info)          MSM_NAND_REG(info, 0x300AC)
+#define MSM_NAND_DEV_CMD1(info)             MSM_NAND_REG(info, 0x370A4)
+#define MSM_NAND_DEV_CMD_VLD(info)          MSM_NAND_REG(info, 0x370AC)
 #define MSM_NAND_EBI2_ECC_BUF_CFG(info)     MSM_NAND_REG(info, 0x300F0)
 
 #define MSM_NAND_ERASED_CW_DETECT_CFG(info)	MSM_NAND_REG(info, 0x300E8)
@@ -195,6 +195,12 @@
 #define MSM_NAND_CMD_PRG_PAGE_ALL       0x39
 #define MSM_NAND_CMD_BLOCK_ERASE        0x3A
 #define MSM_NAND_CMD_FETCH_ID           0x0B
+
+/* register values need to write to get the UUID */
+#define MSM_NAND_FLASH_UUID_READ_ADDR   0xED
+
+/* Configure bits 24 to 31 as 0xED value to obtain the UUID */
+#define MSM_NAND_READ_PARAMETER_PAGE_CODE_UUID   (0xED << 24)
 
 /* device read commands for pagescope */
 
@@ -285,6 +291,7 @@ struct msm_nand_chip {
 	uint32_t qpic_version; /* To store the qpic controller major version */
 	uint16_t qpic_min_version; /* To store the qpic controller minor version */
 	uint32_t caps; /* General host capabilities */
+	uint8_t uuid[16]; /* To store the UUID of NAND device */
 #define MSM_NAND_CAP_PAGE_SCOPE_READ	BIT(0)
 #define MSM_NAND_CAP_MULTI_PAGE_READ	BIT(1)
 #define MSM_NAND_CAP_BOOST_MODE		BIT(2)

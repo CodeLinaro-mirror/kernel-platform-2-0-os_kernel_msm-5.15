@@ -38,6 +38,19 @@ static int __init get_active_boot_part(char *str)
 __setup("part.activeboot=", get_active_boot_part);
 #endif
 
+static ssize_t msm_nand_uuid_show(struct device *dev,
+					struct device_attribute *attr,
+					char *buf);
+
+static struct device_attribute nand_uuid_data =
+	__ATTR(nand_uuid, 0444,
+		msm_nand_uuid_show, NULL);
+
+static void msm_nand_cleanup_sysfs(struct device *dev)
+{
+	device_remove_file(dev, &nand_uuid_data);
+}
+
 /*
  * Get the DMA memory for requested amount of size. It returns the pointer
  * to free memory available from the allocated pool. Returns NULL if there
@@ -829,6 +842,18 @@ struct msm_nand_flash_onfi_data {
 	uint32_t ecc_bch_cfg;
 };
 
+/*
+ * Structure that contains NANDc register data for commands required
+ * for reading UUID.
+ */
+struct msm_nand_flash_uuid_data {
+	struct msm_nand_common_cfgs cfg;
+	uint32_t exec;
+	uint32_t cmd_vld;
+	uint32_t cmd1;
+	uint32_t ecc_bch_cfg;
+};
+
 struct version {
 	uint16_t nand_major;
 	uint16_t nand_minor;
@@ -869,6 +894,242 @@ static int msm_nand_version_check(struct msm_nand_info *info,
 		nandc_version->qpic_major, nandc_version->qpic_minor);
 out:
 	return err;
+}
+
+/*
+ * Function to show the UUID of attached NAND flash device
+ * called from sysfs by reading nand_uuid file.
+ */
+static ssize_t msm_nand_uuid_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+
+	struct msm_nand_info *info = dev_get_drvdata(dev);
+	struct msm_nand_chip *chip = &info->nand_chip;
+	ssize_t count = 0;
+	int i;
+
+	for (i = 0; i < 16; i++)
+		count += scnprintf(buf + count, PAGE_SIZE - count, "%02X ",
+				chip->uuid[i]);
+	count += scnprintf(buf + count, PAGE_SIZE - count, "\n");
+
+	return count;
+}
+
+/*
+ * Function to read the UUID of attached NAND flash device
+ * function is called only if the NAND device is ONFI compliant.
+ */
+#define UUID_CMDS 12
+static void msm_nand_read_uuid(struct msm_nand_info *info)
+{
+	struct msm_nand_chip *chip = &info->nand_chip;
+	int err = 0, i = 0, submitted_num_desc = 1;
+	uint32_t cmd1_orig = 0, cmd_vld_orig = 0;
+	int uuid_count = 0, word_count = 0;
+	uint32_t *lower_bytes_base, *lower_bytes;
+	uint32_t *upper_bytes_base, *upper_bytes;
+
+	/* SPS parameters */
+	struct msm_nand_sps_cmd *cmd, *curr_cmd;
+	struct sps_iovec *iovec;
+	struct sps_iovec iovec_temp;
+	uint32_t rdata;
+
+	/* UUID parameters */
+	struct msm_nand_flash_uuid_data data;
+	uint8_t *uuid_buf = NULL;
+	dma_addr_t dma_addr_uuid_info = 0;
+
+	/*
+	 * The following 11 commands are required to get uuid data -
+	 * flash, addr0, addr1, cfg0, cfg1, dev0_ecc_cfg,dev_cmd1,dev_vld,
+	 * read_loc_0, exec, flash_status (read cmd).
+	 */
+	struct {
+		struct sps_transfer xfer;
+		struct sps_iovec cmd_iovec[UUID_CMDS];
+		struct msm_nand_sps_cmd cmd[UUID_CMDS];
+		uint32_t flash_status;
+	} *dma_buffer;
+
+	wait_event(chip->dma_wait_queue, (uuid_buf =
+		msm_nand_get_dma_buffer(chip, ONFI_PARAM_INFO_LENGTH)));
+	dma_addr_uuid_info = msm_virt_to_dma(chip, uuid_buf);
+
+	wait_event(chip->dma_wait_queue, (dma_buffer = msm_nand_get_dma_buffer
+				(chip, sizeof(*dma_buffer))));
+
+	memset(&data, 0, sizeof(struct msm_nand_flash_uuid_data));
+	data.cfg.cmd = MSM_NAND_CMD_PAGE_READ_ONFI;
+	data.exec = 1;
+	data.cfg.addr0 = 0x0;
+	data.cfg.addr1 = 0x0;
+	data.cfg.cfg0 = MSM_NAND_CFG0_RAW_ONFI_PARAM_INFO;
+	data.cfg.cfg1 = MSM_NAND_CFG1_RAW_ONFI_PARAM_INFO;
+	data.ecc_bch_cfg = 1 << ECC_CFG_ECC_DISABLE;
+	dma_buffer->flash_status = 0xeeeeeeee;
+
+	/* Save MSM_NAND_DEV_CMD1 register contents */
+	err = msm_nand_flash_rd_rw_reg(info, MSM_NAND_DEV_CMD1(info), &cmd1_orig, READ);
+	if (!err)
+		data.cmd1 = (cmd1_orig & (~0xFF)) | MSM_NAND_FLASH_UUID_READ_ADDR;
+
+	/* Save MSM_NAND_DEV_CMD_VLD register contents */
+	err = msm_nand_flash_rd_rw_reg(info, MSM_NAND_DEV_CMD_VLD(info), &cmd_vld_orig, READ);
+	if (!err)
+		data.cmd_vld = (cmd_vld_orig & 0x00FFFFFF) |
+				MSM_NAND_READ_PARAMETER_PAGE_CODE_UUID;
+
+	curr_cmd = cmd = dma_buffer->cmd;
+	msm_nand_prep_cfg_cmd_desc(info, data.cfg, &curr_cmd);
+	cmd = curr_cmd;
+
+	msm_nand_prep_single_desc(cmd, MSM_NAND_DEV_CMD1(info), WRITE,
+			data.cmd1, 0);
+	cmd++;
+
+	msm_nand_prep_single_desc(cmd, MSM_NAND_DEV_CMD_VLD(info), WRITE,
+			data.cmd_vld, 0);
+	cmd++;
+
+	msm_nand_prep_single_desc(cmd, MSM_NAND_DEV0_ECC_CFG(info), WRITE,
+			data.ecc_bch_cfg, 0);
+	cmd++;
+
+	rdata = (0 << 0) | (ONFI_PARAM_INFO_LENGTH << 16) | (1 << 31);
+	msm_nand_prep_single_desc(cmd, MSM_NAND_READ_LOCATION_0(info), WRITE,
+			rdata, 0);
+	cmd++;
+
+	if (chip->qpic_version >= 2) {
+		msm_nand_prep_single_desc(cmd,
+			MSM_NAND_READ_LOCATION_LAST_CW_0(info), WRITE,
+			rdata, 0);
+		cmd++;
+	}
+
+	msm_nand_prep_single_desc(cmd, MSM_NAND_EXEC_CMD(info), WRITE,
+		data.exec, SPS_IOVEC_FLAG_NWD);
+	cmd++;
+
+	msm_nand_prep_single_desc(cmd, MSM_NAND_FLASH_STATUS(info), READ,
+		msm_virt_to_dma(chip, &dma_buffer->flash_status),
+		SPS_IOVEC_FLAG_UNLOCK | SPS_IOVEC_FLAG_INT);
+	cmd++;
+
+	WARN_ON(cmd - dma_buffer->cmd > UUID_CMDS);
+	dma_buffer->xfer.iovec_count = (cmd - dma_buffer->cmd);
+	dma_buffer->xfer.iovec = dma_buffer->cmd_iovec;
+	dma_buffer->xfer.iovec_phys = msm_virt_to_dma(chip,
+					&dma_buffer->cmd_iovec);
+	iovec = dma_buffer->xfer.iovec;
+
+	for (i = 0; i < dma_buffer->xfer.iovec_count; i++) {
+		iovec->addr =  msm_virt_to_dma(chip,
+				&dma_buffer->cmd[i].ce);
+		iovec->size = sizeof(struct sps_command_element);
+		iovec->flags = dma_buffer->cmd[i].flags;
+		iovec++;
+	}
+
+	mutex_lock(&info->lock);
+	err = msm_nand_get_device(chip->dev);
+	if (err)
+		goto unlock_mutex;
+	/* Submit data descriptor */
+	err = sps_transfer_one(info->sps.data_prod.handle, dma_addr_uuid_info,
+			ONFI_PARAM_INFO_LENGTH, NULL, SPS_IOVEC_FLAG_INT);
+	if (err) {
+		pr_err("Failed to submit data descs %d\n", err);
+		goto put_dev;
+	}
+	/* Submit command descriptors */
+	err =  sps_transfer(info->sps.cmd_pipe.handle,
+			&dma_buffer->xfer);
+	if (err) {
+		pr_err("Failed to submit commands %d\n", err);
+		goto put_dev;
+	}
+
+	err = msm_nand_sps_get_iovec(info, dma_buffer->xfer.iovec_count,
+					submitted_num_desc, 0, 0, &iovec_temp);
+	if (err)
+		goto put_dev;
+
+	err = msm_nand_put_device(chip->dev);
+	mutex_unlock(&info->lock);
+	if (err)
+		goto free_dma;
+
+	/* Restore MSM_NAND_DEV_CMD1 register contents */
+	err = msm_nand_flash_rd_rw_reg(info, MSM_NAND_DEV_CMD1(info), &cmd1_orig, WRITE);
+
+	/* Restore MSM_NAND_DEV_CMD_VLD register contents */
+	err = msm_nand_flash_rd_rw_reg(info, MSM_NAND_DEV_CMD_VLD(info), &cmd_vld_orig, WRITE);
+
+	/* Check for flash status errors */
+	if (dma_buffer->flash_status & (FS_OP_ERR | FS_MPU_ERR)) {
+		pr_err("MPU/OP err (0x%x) is set\n", dma_buffer->flash_status);
+		err = -EIO;
+		goto free_dma;
+	}
+
+	/*
+	 * Sixteen copies of the unique ID data are stored in the device. Each copy is 32 bytes.
+	 * The first 16 bytes of a 32-byte copy are unique data, and the second 16 bytes are
+	 * the complement of the first 16 bytes. The host should XOR the first 16 bytes with the
+	 * second 16 bytes. if the result is 16 bytes of FFh, then that copy of the unique ID
+	 * data is correct. In the event that a non-FFh result is returned, repeat the XOR
+	 * operation on a subsequent copy of the unique ID data.
+	 */
+	lower_bytes = lower_bytes_base = (uint32_t *)uuid_buf;
+	upper_bytes = upper_bytes_base = (uint32_t *)uuid_buf + 4;
+	for ( ; uuid_count < 16; lower_bytes_base = lower_bytes,
+				upper_bytes_base = upper_bytes, uuid_count++)  {
+		word_count = 0;
+		for ( ; word_count < 4; lower_bytes++, upper_bytes++) {
+			if (((*lower_bytes) ^ (*upper_bytes)) == 0xFFFFFFFF) {
+				word_count++;
+				continue;
+			} else {
+				lower_bytes = lower_bytes_base + 8;
+				upper_bytes = lower_bytes + 4;
+				break;
+			}
+		}
+		if (word_count == 4) {
+			memcpy(chip->uuid, lower_bytes_base, 16);
+			break;
+		}
+		continue;
+	}
+	if (uuid_count == 16)
+		pr_err("UUID corrupted\n");
+
+	goto free_dma;
+put_dev:
+	msm_nand_put_device(chip->dev);
+unlock_mutex:
+	mutex_unlock(&info->lock);
+free_dma:
+	msm_nand_release_dma_buffer(chip, dma_buffer, sizeof(*dma_buffer));
+	msm_nand_release_dma_buffer(chip, uuid_buf,
+			ONFI_PARAM_INFO_LENGTH);
+}
+
+static void msm_nand_init_sysfs(struct device *dev)
+{
+	int err = 0;
+	struct msm_nand_info *info = dev_get_drvdata(dev);
+
+	sysfs_attr_init(&nand_uuid_data);
+	err = device_create_file(dev, &nand_uuid_data);
+	if (err)
+		pr_err("sysfs entry create failed %d\n", err);
+
+	msm_nand_read_uuid(info);
 }
 
 /*
@@ -5316,6 +5577,8 @@ static int msm_nand_probe(struct platform_device *pdev)
 	pr_info("Host capabilities:0x%08x\n", info->nand_chip.caps);
 	dev_node = dev;
 	msm_nand_bam_register_panic_handler();
+	if (info->flash_dev.is_onfi_compliant)
+		msm_nand_init_sysfs(dev);
 	goto out;
 free_bam:
 	msm_nand_bam_free(info);
@@ -5337,6 +5600,8 @@ static int msm_nand_remove(struct platform_device *pdev)
 {
 	struct msm_nand_info *info = dev_get_drvdata(&pdev->dev);
 
+	if (info->flash_dev.is_onfi_compliant)
+		msm_nand_cleanup_sysfs(&pdev->dev);
 	msm_nand_bam_unregister_panic_handler();
 	if (pm_runtime_suspended(&(pdev)->dev))
 		pm_runtime_resume(&(pdev)->dev);
