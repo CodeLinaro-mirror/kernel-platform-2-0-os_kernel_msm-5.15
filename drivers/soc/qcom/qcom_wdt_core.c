@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023, 2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/irqdomain.h>
 #include <linux/delay.h>
@@ -34,7 +34,7 @@
 #include <asm/hardirq.h>
 #include <linux/suspend.h>
 #include <linux/notifier.h>
-#ifdef CONFIG_POWER_RESET_QCOM_STORE_RESET_REASON
+#ifdef CONFIG_POWER_RESET_QCOM_RESET_REASON
 #include <linux/reset_reason.h>
 #endif
 
@@ -710,7 +710,7 @@ static irqreturn_t qcom_wdt_bark_handler(int irq, void *dev_id)
 	if (wdog_dd->freeze_in_progress)
 		dev_info(wdog_dd->dev, "Suspend in progress\n");
 
-#ifdef CONFIG_POWER_RESET_QCOM_STORE_RESET_REASON
+#ifdef CONFIG_POWER_RESET_QCOM_RESET_REASON
 	store_reset_reason("watchdog bark", NULL);
 #endif
 	md_dump_process();
