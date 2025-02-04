@@ -3,7 +3,7 @@
  * Copyright (c) 2020 Synopsys, Inc. and/or its affiliates.
  * Synopsys DesignWare XPCS helpers
  */
-/* Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved. */
+/* Copyright (c) 2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved. */
 
 #ifndef __LINUX_PCS_XPCS_QCOM_H
 #define __LINUX_PCS_XPCS_QCOM_H
@@ -27,6 +27,7 @@ struct dw_xpcs_qcom {
 	bool intr_en;
 	bool sgmii_2p5g_en;
 	bool fixed_phy_mode;
+	bool xpcs_autoneg_disabled;
 };
 
 #if IS_ENABLED(CONFIG_PCS_QCOM)
@@ -40,7 +41,7 @@ void qcom_xpcs_validate(struct dw_xpcs_qcom *xpcs, unsigned long *supported,
 int qcom_xpcs_config_eee(struct dw_xpcs_qcom *xpcs, int mult_fact_100ns,
 		    int enable);
 struct dw_xpcs_qcom *qcom_xpcs_create(void __iomem *addr,
-				      phy_interface_t interface);
+				      phy_interface_t interface, bool xpcs_autoneg_disabled);
 void qcom_xpcs_destroy(struct dw_xpcs_qcom *xpcs);
 const struct xpcs_compat *xpcs_find_compat(const struct xpcs_id *id,
 					   phy_interface_t interface);
@@ -81,7 +82,8 @@ static inline int qcom_xpcs_config_eee(struct dw_xpcs_qcom *xpcs, int mult_fact_
 }
 
 static inline struct dw_xpcs_qcom *qcom_xpcs_create(void __iomem *addr,
-						    phy_interface_t interface)
+						    phy_interface_t interface,
+						    bool xpcs_autoneg_disabled)
 {
 	return NULL;
 }

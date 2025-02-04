@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+/* Copyright (c) 2022-2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/of.h>
 #include <linux/pcs-xpcs-qcom.h>
@@ -63,6 +63,7 @@ int ethqos_xpcs_init(struct net_device *ndev)
 	struct stmmac_priv *priv = netdev_priv(ndev);
 	struct qcom_ethqos *ethqos = priv->plat->bsp_priv;
 	void __iomem *xpcs_base;
+	bool xpcs_autoneg_disabled = false;
 
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
 	update_marker("M - Ethernet xpcs init start");
@@ -74,7 +75,12 @@ int ethqos_xpcs_init(struct net_device *ndev)
 		return -ENODEV;
 	}
 
-	qxpcs = qcom_xpcs_create(xpcs_base, priv->plat->phy_interface);
+	if (of_property_read_bool(ethqos->pdev->dev.of_node, "qcom,xpcs_autoneg_disabled"))
+		xpcs_autoneg_disabled = true;
+	else
+		xpcs_autoneg_disabled = false;
+
+	qxpcs = qcom_xpcs_create(xpcs_base, priv->plat->phy_interface, xpcs_autoneg_disabled);
 	if (!qxpcs || IS_ERR(qxpcs)) {
 		ETHQOSERR("XPCS failed to be created: %d\n", PTR_ERR(qxpcs));
 		return -ENODEV;
