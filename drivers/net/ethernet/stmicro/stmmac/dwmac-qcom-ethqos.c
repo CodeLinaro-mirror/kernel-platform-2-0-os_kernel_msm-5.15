@@ -3618,6 +3618,10 @@ static int phy_sgmii_usxgmii_digital_loopback(struct qcom_ethqos *ethqos, int sp
 	struct stmmac_priv *priv = qcom_ethqos_get_priv(ethqos);
 	unsigned int phydata = 0;
 
+	if (!priv->dev->phydev) {
+		ETHQOSERR("Invalid operation when link is down");
+		return -EINVAL;
+	}
 	qcom_xpcs_link_up(&priv->hw->qxpcs->pcs, 1, priv->plat->interface,
 			  speed, priv->dev->phydev->duplex);
 
