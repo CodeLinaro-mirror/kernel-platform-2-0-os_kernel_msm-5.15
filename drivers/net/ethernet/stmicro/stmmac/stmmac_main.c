@@ -1468,10 +1468,10 @@ static void stmmac_mac_link_up(struct phylink_config *config,
 	 *       2. SGMII 2.5G and 2500-BaseX doesn't support AN interrupt.
 	 */
 	if (priv->plat->fix_mac_speed &&
-	    (!priv->plat->fixed_phy_mode || !priv->hw->qxpcs->c37_an_en ||
+	    (!priv->plat->fixed_phy_mode || !priv->hw->qxpcs ||
+	     !priv->hw->qxpcs->c37_an_en ||
 	     (priv->plat->fixed_phy_mode && !is_c37_an_supported(priv))))
 		priv->plat->fix_mac_speed(priv->plat->bsp_priv, speed);
-
 
 	if (!duplex)
 		ctrl &= ~priv->hw->link.duplex;
@@ -1491,7 +1491,8 @@ static void stmmac_mac_link_up(struct phylink_config *config,
 	if (priv->plat->xpcs_linkup)
 		priv->plat->xpcs_linkup(priv->plat->bsp_priv, speed);
 
-	if (!priv->plat->fixed_phy_mode || !priv->hw->qxpcs->c37_an_en ||
+	if (!priv->plat->fixed_phy_mode || !priv->hw->qxpcs ||
+	    !priv->hw->qxpcs->c37_an_en ||
 	    (priv->plat->fixed_phy_mode && !is_c37_an_supported(priv))) {
 		stmmac_mac_flow_ctrl(priv, duplex);
 		writel(ctrl, priv->ioaddr + MAC_CTRL_REG);
