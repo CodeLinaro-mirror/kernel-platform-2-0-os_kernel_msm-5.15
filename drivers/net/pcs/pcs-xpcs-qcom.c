@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020 Synopsys, Inc. and/or its affiliates.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * Synopsys DesignWare XPCS helpers
  *
  * Author: Jose Abreu <Jose.Abreu@synopsys.com>
@@ -713,6 +713,12 @@ static int qcom_xpcs_config(struct phylink_pcs *pcs, unsigned int mode, phy_inte
 			    bool permit_pause_to_mac)
 {
 	struct dw_xpcs_qcom *xpcs = phylink_pcs_to_xpcs(pcs);
+	if (!xpcs->xpcs_autoneg_disabled) {
+		XPCSINFO("autoneg enabled");
+	} else {
+		XPCSINFO("autoneg disabled");
+		return 0;
+	}
 
 	return qcom_xpcs_do_config(xpcs, interface);
 }
@@ -810,6 +816,7 @@ void qcom_xpcs_link_up_sgmii(struct dw_xpcs_qcom *xpcs, int speed, int duplex)
 {
 	int mmd_ctrl, an_ctrl;
 	int ret = 0;
+	u32 tmp;
 
 	if (speed == SPEED_2500) {
 		ret = qcom_xpcs_set_2p5g_sgmii(xpcs, duplex);
@@ -822,6 +829,15 @@ void qcom_xpcs_link_up_sgmii(struct dw_xpcs_qcom *xpcs, int speed, int duplex)
 			goto err;
 	}
 
+	if (xpcs->xpcs_autoneg_disabled) {
+		if (readl_poll_timeout(xpcs->addr + DW_SR_MII_MMD_STS, tmp,
+				       tmp & DW_SR_MII_STS_LINK_STS, 500,
+				       100000)) {
+			XPCSERR("Link is not up, timer expired\n");
+		} else {
+			XPCSINFO("Link is up\n");
+		}
+	}
 	an_ctrl = qcom_xpcs_read(xpcs, DW_VR_MII_AN_CTRL);
 	if (an_ctrl < 0)
 		goto err;
@@ -871,6 +887,7 @@ err:
 void qcom_xpcs_link_up_usxgmii(struct dw_xpcs_qcom *xpcs, int speed)
 {
 	int mmd_ctrl;
+	u32 tmp;
 
 	mmd_ctrl = qcom_xpcs_read(xpcs, DW_SR_MII_MMD_CTRL);
 	if (mmd_ctrl < 0)
@@ -905,6 +922,16 @@ void qcom_xpcs_link_up_usxgmii(struct dw_xpcs_qcom *xpcs, int speed)
 	default:
 		XPCSERR("Invalid speed mode selected\n");
 		return;
+	}
+
+	if (xpcs->xpcs_autoneg_disabled) {
+		if (readl_poll_timeout(xpcs->addr + DW_SR_MII_MMD_STS, tmp,
+				       tmp & DW_SR_MII_STS_LINK_STS, 500,
+				       100000)) {
+			XPCSERR("Link is not up, timer expired\n");
+		} else {
+			XPCSINFO("Link is up\n");
+		}
 	}
 
 	mmd_ctrl = qcom_xpcs_write(xpcs, DW_SR_MII_MMD_CTRL, mmd_ctrl);
@@ -1086,7 +1113,8 @@ out:
 	return -EINVAL;
 }
 
-struct dw_xpcs_qcom *qcom_xpcs_create(void __iomem *addr, phy_interface_t interface)
+struct dw_xpcs_qcom *qcom_xpcs_create(void __iomem *addr, phy_interface_t interface,
+				      bool xpcs_autoneg_disabled)
 {
 	const struct xpcs_compat *compat;
 	struct dw_xpcs_qcom *xpcs;
@@ -1120,6 +1148,7 @@ struct dw_xpcs_qcom *qcom_xpcs_create(void __iomem *addr, phy_interface_t interf
 			goto out;
 		}
 
+		xpcs->xpcs_autoneg_disabled = xpcs_autoneg_disabled;
 		xpcs->pcs.ops = &qcom_xpcs_phylink_ops;
 		xpcs->pcs.poll = true;
 
