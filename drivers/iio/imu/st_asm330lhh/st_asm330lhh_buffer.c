@@ -277,7 +277,8 @@ static void store_acc_gyro_boot_sample(struct iio_dev *iio_dev,
 				sensor->id, sensor->bufsample_cnt, sensor->enable);
 		sensor->buffer_asm_samples = false;
 		if (!sensor->enable) {
-			st_asm330lhh_sensor_set_enable(sensor, false);
+			if (sensor->id == ST_ASM330LHH_ID_ACC || sensor->id == ST_ASM330LHH_ID_GYRO)
+				st_asm330lhh_sensor_set_enable(sensor, false);
 			if (!hw->enable_mask) {
 				st_asm330lhh_set_fifo_mode(hw,
 						ST_ASM330LHH_FIFO_BYPASS);
