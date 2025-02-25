@@ -433,6 +433,7 @@ struct stmmac_priv {
 
 	bool phy_irq_enabled;
 	bool wol_irq_enabled;
+	bool pcs_irq_enabled;
 	bool en_wol;
 	u32 avb_vlan_id;
 	gh_vmid_t v2x_vm_id;
