@@ -7,6 +7,7 @@
 #include <linux/platform_device.h>
 #include "stmmac.h"
 #include "dwmac-qcom-ethqos.h"
+#include "dwmac-qcom-serdes.h"
 
 static void ethqos_defer_pcs_isr_work(struct work_struct *work)
 {
@@ -14,8 +15,22 @@ static void ethqos_defer_pcs_isr_work(struct work_struct *work)
 		container_of(work, struct qcom_ethqos, emac_pcs_work);
 	struct stmmac_priv *priv = qcom_ethqos_get_priv(ethqos);
 	int ret;
+	u32 retry = 10;
 
 	ret = qcom_xpcs_handle_an_intr(priv->hw->qxpcs, priv->plat->phy_interface);
+
+	if (priv->plat->fixed_phy_mode) {
+		// Do serdes reset to ensure AN complete
+		do {
+			if (qcom_xpcs_verify_an(priv->hw->qxpcs))
+				break;
+			qcom_ethqos_serdes_phy_soft_reset(ethqos);
+			usleep_range(15000, 20000);
+		} while (--retry);
+
+		if (!retry)
+			ETHQOSINFO("AN incomplete, SerDes reset %d times\n", 10 - retry);
+	}
 
 	if (priv->plat->fix_mac_speed && !ret) {
 		priv->plat->fix_mac_speed(priv->plat->bsp_priv, priv->speed);
