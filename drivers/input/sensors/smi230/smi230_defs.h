@@ -375,6 +375,9 @@
 /**\name    Gyro Power register */
 #define SMI230_GYRO_LPM1_REG UINT8_C(0x11)
 
+/**\name    Gyro RATE_HBW register */
+#define SMI230_GYRO_RATE_HBW_REG UINT8_C(0x13)
+
 /**\name    Gyro Soft reset register */
 #define SMI230_GYRO_SOFTRESET_REG UINT8_C(0x14)
 
@@ -442,7 +445,7 @@
 #define SMI230_GYRO_SOFTRESET_DELAY UINT8_C(30)
 
 /**\name    Gyro power mode config delay */
-#define SMI230_GYRO_POWER_MODE_CONFIG_DELAY UINT8_C(30)
+#define SMI230_GYRO_POWER_MODE_CONFIG_DELAY UINT8_C(200)
 
 /** Mask definitions for range, bandwidth and power */
 #define SMI230_GYRO_RANGE_MASK UINT8_C(0x07)
@@ -815,6 +818,17 @@ enum smi230_intf {
 	SMI230_SPI_INTF
 };
 
+/*!
+ * @brief gyro_suspend_mode selection enums
+ */
+enum smi230_gyro_suspend_mode {
+	/*! SUSPEND */
+	SMI230_GYRO_SUSPEND,
+
+	/*! DEEP SUSPEND */
+	SMI230_GYRO_DEEP_SUSPEND
+};
+
 /*************************** Data structures *****************************/
 
 /**\name    Typedef definitions */
@@ -880,6 +894,38 @@ struct smi230_cfg {
 
 	/*! fifo watermark level */
 	uint8_t fifo_wm;
+};
+
+struct smi230_gyro_regs {
+	/*! range register*/
+	uint8_t range_reg;
+
+	/*! bandwidth register*/
+	uint8_t bw_reg;
+
+	/*! RATE_HBW  register*/
+	uint8_t rate_hbw_reg;
+
+	/*! GYRO_INT_CTRL register */
+	uint8_t gyro_int_ctrl_reg;
+
+	/*! INT_EN_1 register */
+	uint8_t int_en_1_reg;
+
+	/*! INT3_INT4_IO_MAP register*/
+	uint8_t int3_int4_io_map_reg;
+
+	/*! FIFO_WM_ENABLE register*/
+	uint8_t fifo_wm_enable_reg;
+
+	/*! BGW_SPI3_WDT_FIFO register*/
+	uint8_t bgw_spi3_wdt_fifo_reg;
+
+	/*! FIFO_CONFIG_0 register*/
+	uint8_t fifo_config_0_reg;
+
+	/*! FIFO_CONFIG_1 register*/
+	uint8_t fifo_config_1_reg;
 };
 
 /*!
@@ -1263,6 +1309,15 @@ struct smi230_dev {
 
 	/*! Structure to configure gyro sensor  */
 	struct smi230_cfg gyro_cfg;
+
+	/*! Structure to save gyro reg values  */
+	struct smi230_gyro_regs gyro_regs;
+
+	/*! pm suspend entry  */
+	enum smi230_gyro_suspend_mode gyro_sus_etr;
+
+	/*! pm freeze entry  */
+	enum smi230_gyro_suspend_mode gyro_frez_etr;
 
 	/*! Config stream data buffer address will be assigned */
 	const uint8_t *config_file_ptr;

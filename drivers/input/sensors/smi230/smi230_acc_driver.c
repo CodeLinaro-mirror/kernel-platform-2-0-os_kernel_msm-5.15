@@ -228,7 +228,7 @@ static ssize_t smi230_acc_store_acc_pwr_cfg(struct device *dev,
 		return err;
 
 	smi230_check_acc_enable_flag(client_data, pwr_cfg);
-
+	mutex_lock(&interrupt_handling_lock);
 	if (pwr_cfg == 3) {
 		p_smi230_dev->accel_cfg.power = SMI230_ACCEL_PM_SUSPEND;
 		err = smi230_acc_set_power_mode(p_smi230_dev);
@@ -239,12 +239,14 @@ static ssize_t smi230_acc_store_acc_pwr_cfg(struct device *dev,
 		client_data->timestamp_old = ktime_get_boottime_ns();
 	}
 
-	PDEBUG("set power cfg to %ld, err %d", pwr_cfg, err);
+	PINFO("set power cfg to %ld, err %d", pwr_cfg, err);
 
 	if (err) {
 		PERR("failed");
+		mutex_unlock(&interrupt_handling_lock);
 		return err;
 	}
+	mutex_unlock(&interrupt_handling_lock);
 	return count;
 }
 
@@ -632,27 +634,46 @@ static ssize_t smi230_acc_store_range(struct device *dev,
 	}
 
 	mutex_lock(&interrupt_handling_lock);
-	err |= smi230_acc_set_meas_conf(p_smi230_dev);
-
-	usleep_range(1000, 1001);
-	err |= smi230_acc_get_regs(SMI230_ACCEL_RANGE_REG, &data, 1,
-							   p_smi230_dev);
+	err = smi230_acc_set_meas_conf(p_smi230_dev);
+	if (err) {
+		PERR("setting range failed");
+		mutex_unlock(&interrupt_handling_lock);
+		return err;
+	}
+	msleep(1);
+	err = smi230_acc_get_regs(SMI230_ACCEL_RANGE_REG, &data, 1,
+				  p_smi230_dev);
+	if (err) {
+		PERR("read back range failed");
+		mutex_unlock(&interrupt_handling_lock);
+		return err;
+	}
 	range_reg_val = data & SMI230_ACCEL_RANGE_MASK;
 	if (range_reg_val != p_smi230_dev->accel_cfg.range) {
-		usleep_range(1000, 1001);
-		err |= smi230_acc_set_meas_conf(p_smi230_dev);
+		msleep(1);
+		err = smi230_acc_set_meas_conf(p_smi230_dev);
+		if (err) {
+			PERR("setting range failed");
+			mutex_unlock(&interrupt_handling_lock);
+			return err;
+		}
+		msleep(1);
+		err = smi230_acc_get_regs(SMI230_ACCEL_RANGE_REG, &data, 1,
+					  p_smi230_dev);
+		if (err) {
+			PERR("read back range failed");
+			mutex_unlock(&interrupt_handling_lock);
+			return err;
+		}
+		range_reg_val = data & SMI230_ACCEL_RANGE_MASK;
 	}
 	mutex_unlock(&interrupt_handling_lock);
 
-	if (err) {
-		PERR("setting range failed");
-		return err;
-	}
 	if (range_reg_val == p_smi230_dev->accel_cfg.range)
-		PDEBUG("set range to %d, err %d", range, err);
+		PDEBUG("successfully set range to %d", range);
 	else {
 		PDEBUG("set range to %d failed. reg_val %d", range,
-				range_reg_val);
+		       range_reg_val);
 		return -1;
 	}
 	return count;
@@ -2364,6 +2385,18 @@ int smi230_acc_remove(struct device *dev)
 	return err;
 }
 
+int smi230_acc_shutdown(struct device *dev)
+{
+	int ret = 0;
+
+	mutex_lock(&interrupt_handling_lock);
+	p_smi230_dev->accel_cfg.power = SMI230_ACCEL_PM_SUSPEND;
+	PINFO("Sensor %s Shutdown: suspended", SENSOR_ACC_NAME);
+	ret = smi230_acc_set_power_mode(p_smi230_dev);
+	mutex_unlock(&interrupt_handling_lock);
+	return ret;
+}
+
 static int smi230_acc_configuration(struct smi230_dev *p_smi230_dev)
 {
 	int err;
@@ -2408,7 +2441,7 @@ static int smi230_acc_configuration(struct smi230_dev *p_smi230_dev)
 
 	p_smi230_dev->accel_cfg.odr = SMI230_ACCEL_ODR_100_HZ;
 	p_smi230_dev->accel_cfg.bw = SMI230_ACCEL_BW_NORMAL;
-	p_smi230_dev->accel_cfg.range = SMI230_ACCEL_RANGE_2G;
+	p_smi230_dev->accel_cfg.range = SMI230_ACCEL_RANGE_4G;
 
 	err |= smi230_acc_set_meas_conf(p_smi230_dev);
 	smi230_delay(100);
@@ -2776,4 +2809,52 @@ exit_free_client_data:
 		kfree(client_data);
 exit_directly:
 	return err;
+}
+
+int smi230_acc_suspend(struct device *dev)
+{
+	int ret = 0;
+
+	mutex_lock(&interrupt_handling_lock);
+	p_smi230_dev->accel_cfg.power = SMI230_ACCEL_PM_SUSPEND;
+	ret = smi230_acc_set_power_mode(p_smi230_dev);
+	PINFO("Sensor %s Suspended", SENSOR_ACC_NAME);
+	mutex_unlock(&interrupt_handling_lock);
+	return ret;
+}
+
+int smi230_acc_resume(struct device *dev)
+{
+	int ret = 0;
+
+	mutex_lock(&interrupt_handling_lock);
+	p_smi230_dev->accel_cfg.power = SMI230_ACCEL_PM_ACTIVE;
+	ret = smi230_acc_set_power_mode(p_smi230_dev);
+	PINFO("Sensor %s Resumed", SENSOR_ACC_NAME);
+	mutex_unlock(&interrupt_handling_lock);
+	return ret;
+}
+
+int smi230_acc_freeze(struct device *dev)
+{
+	int ret = 0;
+
+	mutex_lock(&interrupt_handling_lock);
+	p_smi230_dev->accel_cfg.power = SMI230_ACCEL_PM_SUSPEND;
+	PINFO("Sensor %s Freezed", SENSOR_ACC_NAME);
+	ret = smi230_acc_set_power_mode(p_smi230_dev);
+	mutex_unlock(&interrupt_handling_lock);
+	return ret;
+}
+
+int smi230_acc_restore(struct device *dev)
+{
+	int ret = 0;
+
+	mutex_lock(&interrupt_handling_lock);
+	p_smi230_dev->accel_cfg.power = SMI230_ACCEL_PM_ACTIVE;
+	PINFO("Sensor %s Restored", SENSOR_ACC_NAME);
+	ret = smi230_acc_set_power_mode(p_smi230_dev);
+	mutex_unlock(&interrupt_handling_lock);
+	return ret;
 }

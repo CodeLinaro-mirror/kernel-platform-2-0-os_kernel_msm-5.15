@@ -442,7 +442,27 @@ int8_t smi230_gyro_get_power_mode(struct smi230_dev *dev);
  *  @return Result of API execution status
  *  @retval zero -> Success / -ve value -> Error
  */
-int8_t smi230_gyro_set_power_mode(const struct smi230_dev *dev);
+int8_t smi230_gyro_set_power_mode(struct smi230_dev *dev);
+
+/*!
+ *  @brief This API saves the important register values of the gyro sensor.
+ *
+ *  @param[in] dev : Structure instance of smi230_dev.
+ *
+ *  @return Result of API execution status
+ *  @retval zero -> Success / -ve value -> Error
+ */
+int8_t smi230_gyro_save_context(struct smi230_dev *dev);
+
+/*!
+ *  @brief This API restores the important register values of the gyro sensor.
+ *
+ *  @param[in] dev : Structure instance of smi230_dev.
+ *
+ *  @return Result of API execution status
+ *  @retval zero -> Success / -ve value -> Error
+ */
+int8_t smi230_gyro_restore_context(struct smi230_dev *dev);
 
 /*!
  *  @brief This API reads the gyro data from the sensor,
