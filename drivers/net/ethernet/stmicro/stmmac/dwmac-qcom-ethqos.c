@@ -2,7 +2,7 @@
 
 // Copyright (c) 2018-19, Linaro Limited
 // Copyright (c) 2021, The Linux Foundation. All rights reserved.
-// Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+// Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
 
 #include <linux/module.h>
 #include <linux/of.h>
@@ -6141,6 +6141,18 @@ static int qcom_ethqos_register_panic_notifier(struct qcom_ethqos *ethqos)
 	return ret;
 }
 
+static void qcom_ethqos_unregister_panic_notifier(struct qcom_ethqos *ethqos)
+{
+	kfree(ethqos->mac_reg_list);
+	ethqos->mac_reg_list = NULL;
+
+	if (ethqos->panic_notifier_registered) {
+		atomic_notifier_chain_unregister(&panic_notifier_list,
+						 &ethqos->panic_nb);
+		ethqos->panic_notifier_registered = false;
+	}
+}
+
 static int ethqos_serdes_power_saving(struct net_device *ndev, void *priv,
 				      bool power_state, bool needs_serdes_reset)
 {
@@ -7188,6 +7200,8 @@ static int qcom_ethqos_probe(struct platform_device *pdev)
 
 	if (qcom_ethqos_register_panic_notifier(ethqos))
 		ETHQOSERR("Failed to register panic notifier");
+	else
+		ethqos->panic_notifier_registered = true;
 
 	if (ethqos->qoe_mode) {
 		ethqos_create_emac_device_node(&ethqos->emac_dev_t,
@@ -7253,6 +7267,7 @@ err_clk:
 		clk_disable_unprepare(ethqos->rgmii_clk);
 
 err_mem:
+	qcom_ethqos_unregister_panic_notifier(ethqos);
 	stmmac_remove_config_dt(pdev, plat_dat);
 	ethqos_disable_regulators(ethqos);
 	return ret;
@@ -7316,11 +7331,6 @@ static int qcom_ethqos_remove(struct platform_device *pdev)
 
 	atomic_set(&priv->plat->phy_clks_suspended, 1);
 
-	if (ethqos->mac_reg_list) {
-		kfree(ethqos->mac_reg_list);
-		ethqos->mac_reg_list = NULL;
-	}
-
 	if (plat_dat->mac_err_rec) {
 		ethqos_delete_emac_rec_device_node(&ethqos->emac_rec_dev_t,
 						   &ethqos->emac_rec_cdev,
@@ -7347,10 +7357,7 @@ static int qcom_ethqos_remove(struct platform_device *pdev)
 	emac_emb_smmu_exit();
 	ethqos_disable_regulators(ethqos);
 
-	ret = atomic_notifier_chain_unregister(&panic_notifier_list,
-					     &ethqos->panic_nb);
-	if (ret)
-		return ret;
+	qcom_ethqos_unregister_panic_notifier(ethqos);
 
 	for (i = 0; i < ETH_MAX_NICS; i++) {
 		if (pethqos[i] == ethqos) {
