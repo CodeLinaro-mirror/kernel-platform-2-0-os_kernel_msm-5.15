@@ -7317,7 +7317,7 @@ int qcom_ethqos_bring_up_phy_if(struct device *dev, bool client_mode)
 				break;
 			default:
 				ETHQOSERR("Invalid mode %d\n", ethqos->current_mode);
-				return -1;
+				goto error;
 			}
 		}
 		if (client_mode) {
@@ -7333,12 +7333,12 @@ int qcom_ethqos_bring_up_phy_if(struct device *dev, bool client_mode)
 				break;
 			default:
 				ETHQOSERR("Invalid I/F %d\n", priv->plat->interface);
-				return -1;
+				goto error;
 			}
 
 			ret = ethqos_send_netlink_socket(data, THERM_NEW_LOCAL_ETH_MODE, SUCCESS);
 			if (ret < 0)
-				return -1;
+				goto error;
 
 			if (ethqos->curr_phy_state == ETHQOS_PHY_STATE_DOWN)
 				netif_device_attach(ndev);
@@ -7357,13 +7357,13 @@ int qcom_ethqos_bring_up_phy_if(struct device *dev, bool client_mode)
 								 THERM_NEW_LOCAL_ETH_MODE_UPDATE,
 								 TIMEOUT);
 				if (ret < 0)
-					return -1;
+					goto error;
 			} else if (ethqos->peer_resp >= FAILED) {
 				ret = ethqos_send_netlink_socket(data,
 								 THERM_NEW_LOCAL_ETH_MODE_UPDATE,
 								 FAIL);
 				if (ret < 0)
-					return -1;
+					goto error;
 			} else if (ethqos->peer_cap != ETHQOS_SGMII1G_USXGMII5G_10G) {
 				ret = ethqos_send_netlink_socket(data,
 								 THERM_NEW_LOCAL_ETH_MODE_UPDATE,
@@ -7413,26 +7413,15 @@ int qcom_ethqos_bring_up_phy_if(struct device *dev, bool client_mode)
 		res = stmmac_phy_setup(priv);
 		if (res) {
 			ETHQOSERR("failed to setup phy (%d)\n", res);
-			return -1;
-		}
-	}
-
-
-	if (priv->plat->serdes_powerup) {
-		ret = priv->plat->serdes_powerup(ndev, priv->plat->bsp_priv);
-		if (ret < 0) {
-			pr_info("%s: Serdes powerup failed\n",
-				__func__);
-			return -1;
+			goto error;
 		}
 	}
 
 	ret = ethqos_xpcs_init(ndev);
 	if (ret < 0) {
 		ETHQOSERR("failed to init xpcs (%d)\n", ret);
-		return -1;
+		goto error;
 	}
-
 
 	if (!priv->plat->mac2mac_en && !priv->plat->fixed_phy_mode) {
 		if (priv->plat->interface ==  PHY_INTERFACE_MODE_USXGMII && !priv->plat->mac2mac_en)
@@ -7498,11 +7487,24 @@ int qcom_ethqos_bring_up_phy_if(struct device *dev, bool client_mode)
 							 THERM_NEW_LOCAL_ETH_MODE_UPDATE,
 							 SUCCESS);
 			if (ret < 0)
-				return -1;
+				goto error;
+		}
+	}
+	if (priv->plat->interface ==  PHY_INTERFACE_MODE_USXGMII) {
+		if (netif_running(ndev)) {
+			ret = ndev->netdev_ops->ndo_stop(ndev);
+			if (ret)
+				goto error;
+			ret = ndev->netdev_ops->ndo_open(ndev);
+			if (ret)
+				goto error;
 		}
 	}
 
 	return ret;
+error:
+	pr_info("%s %d bring_up failed\n", __func__, __LINE__);
+	return -1;
 }
 
 int qcom_ethqos_bring_down_phy_if(struct device *dev)
