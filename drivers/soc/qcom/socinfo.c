@@ -2,7 +2,7 @@
 /*
  * Copyright (c) 2009-2017, 2021 The Linux Foundation. All rights reserved.
  * Copyright (c) 2017-2019, Linaro Ltd.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/debugfs.h>
@@ -114,6 +114,8 @@ static const char *const pmic_models[] = {
 	[78] = "PM8775",
 	/* Lemansau SAIL Domain */
 	[79] = "PM8775",
+	[74] = "PMX75",
+	[81] = "PMX75",
 };
 #endif /* CONFIG_DEBUG_FS */
 
