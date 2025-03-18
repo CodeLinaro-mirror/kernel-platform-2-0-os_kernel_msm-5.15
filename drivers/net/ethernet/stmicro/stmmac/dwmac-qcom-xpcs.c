@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+/* Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/of.h>
 #include <linux/phy.h>
@@ -72,8 +72,33 @@ int ethqos_xpcs_intr_enable(struct net_device *ndev)
 			  priv->hw->qxpcs->pcs_intr);
 		return ret;
 	}
+	priv->pcs_irq_enabled = true;
 	ETHQOSINFO("Registered XPCS IRQ\n");
 	return ret;
+}
+
+void ethqos_xpcs_irq_enable(struct net_device *ndev)
+{
+	struct stmmac_priv *priv = netdev_priv(ndev);
+
+	if (priv->hw->qxpcs->pcs_intr) {
+		ETHQOSINFO("Enabling PCS irq = %d\n", priv->pcs_irq_enabled);
+		enable_irq(priv->hw->qxpcs->pcs_intr);
+		priv->pcs_irq_enabled = true;
+	}
+}
+
+void ethqos_xpcs_irq_disable(struct net_device *ndev)
+{
+	struct stmmac_priv *priv = netdev_priv(ndev);
+	struct qcom_ethqos *ethqos = priv->plat->bsp_priv;
+
+	if (priv->hw->qxpcs->pcs_intr) {
+		ETHQOSINFO("Disabling PCS irq = %d\n", priv->pcs_irq_enabled);
+		disable_irq(priv->hw->qxpcs->pcs_intr);
+		flush_work(&ethqos->emac_pcs_work);
+		priv->pcs_irq_enabled = false;
+	}
 }
 
 int ethqos_xpcs_intr_config(struct net_device *ndev)

@@ -8466,8 +8466,10 @@ static int qcom_ethqos_remove(struct platform_device *pdev)
 	priv = qcom_ethqos_get_priv(ethqos);
 
 	if (priv->hw->qxpcs) {
-		if (priv->hw->qxpcs->intr_en)
+		if (priv->hw->qxpcs->intr_en) {
 			free_irq(priv->hw->qxpcs->pcs_intr, priv);
+			priv->pcs_irq_enabled = false;
+		}
 		qcom_xpcs_destroy(priv->hw->qxpcs);
 #if IS_ENABLED(CONFIG_ETHQOS_QCOM_VER4)
 		priv->hw->qxpcs = NULL;
@@ -8601,6 +8603,8 @@ static int qcom_ethqos_suspend(struct device *dev)
 			return -EINVAL;
 	}
 #endif
+
+	ethqos_xpcs_irq_disable(ndev);
 
 	if (ethqos->current_phy_mode == DISABLE_PHY_AT_SUSPEND_ONLY ||
 	    ethqos->current_phy_mode == DISABLE_PHY_SUSPEND_ENABLE_RESUME) {
@@ -8749,6 +8753,8 @@ static int qcom_ethqos_resume(struct device *dev)
 	}
 
 	ret = stmmac_resume(dev);
+
+	ethqos_xpcs_irq_enable(ndev);
 
 	if (ethqos->current_phy_mode == DISABLE_PHY_SUSPEND_ENABLE_RESUME) {
 		ETHQOSINFO("reset phy after clock\n");
