@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020 Synopsys, Inc. and/or its affiliates.
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * Synopsys DesignWare XPCS helpers
  *
  * Author: Jose Abreu <Jose.Abreu@synopsys.com>
@@ -737,6 +737,10 @@ static int qcom_xpcs_config(struct phylink_pcs *pcs, unsigned int mode, phy_inte
 {
 	struct dw_xpcs_qcom *xpcs = phylink_pcs_to_xpcs(pcs);
 
+	if (!xpcs->c37_an_en) {
+		XPCSINFO("C37 Autonegotiation is disabled");
+		return 0;
+	}
 	return qcom_xpcs_do_config(xpcs, interface);
 }
 
@@ -924,6 +928,7 @@ static void qcom_xpcs_link_up_sgmii_2500basex(struct dw_xpcs_qcom *xpcs, int spe
 {
 	int mmd_ctrl, an_ctrl;
 	int ret = 0;
+	u32 tmp;
 
 	if (speed == SPEED_2500) {
 		ret = qcom_xpcs_set_2p5g_sgmii(xpcs, duplex);
@@ -934,6 +939,16 @@ static void qcom_xpcs_link_up_sgmii_2500basex(struct dw_xpcs_qcom *xpcs, int spe
 		ret = qcom_xpcs_unset_2p5g_sgmii(xpcs);
 		if (ret < 0)
 			goto err;
+	}
+
+	if (!xpcs->c37_an_en) {
+		if (readl_poll_timeout(xpcs->addr + DW_SR_MII_MMD_STS, tmp,
+				       tmp & DW_SR_MII_STS_LINK_STS, 500,
+				       100000)) {
+			XPCSERR("C37 AN disabled: Checking LINK_STS, timer expired\n");
+		} else {
+			XPCSERR("C37 AN disabled: Link is up\n");
+		}
 	}
 
 	an_ctrl = qcom_xpcs_read(xpcs, DW_VR_MII_AN_CTRL);
@@ -1200,6 +1215,7 @@ void qcom_xpcs_link_up_usxgmii(struct dw_xpcs_qcom *xpcs, int speed, phy_interfa
 	int ret = 0;
 	int intr_stat;
 	int i;
+	u32 tmp;
 
 	ret = qcom_xpcs_select_mode(xpcs, interface);
 	if (ret < 0) {
@@ -1263,6 +1279,16 @@ void qcom_xpcs_link_up_usxgmii(struct dw_xpcs_qcom *xpcs, int speed, phy_interfa
 	default:
 		XPCSERR("Invalid speed mode selected\n");
 		return;
+	}
+
+	if (!xpcs->c37_an_en) {
+		if (readl_poll_timeout(xpcs->addr + DW_SR_MII_MMD_STS, tmp,
+				       tmp & DW_SR_MII_STS_LINK_STS, 500,
+				       100000)) {
+			XPCSERR("C37 AN disabled: Checking LINK_STS, timer expired\n");
+		} else {
+			XPCSERR("C37 AN disabled: Link is up\n");
+		}
 	}
 
 	mmd_ctrl = qcom_xpcs_write(xpcs, DW_SR_MII_MMD_CTRL, mmd_ctrl);
