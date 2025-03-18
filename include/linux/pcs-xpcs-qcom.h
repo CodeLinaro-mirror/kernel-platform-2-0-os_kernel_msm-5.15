@@ -3,7 +3,7 @@
  * Copyright (c) 2020 Synopsys, Inc. and/or its affiliates.
  * Synopsys DesignWare XPCS helpers
  */
-/* Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved. */
+/* Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved. */
 
 #ifndef __LINUX_PCS_XPCS_QCOM_H
 #define __LINUX_PCS_XPCS_QCOM_H
@@ -23,7 +23,7 @@ struct dw_xpcs_qcom {
 	const struct xpcs_id *id;
 	struct phylink_pcs pcs;
 	void __iomem *addr;
-	int pcs_intr;
+	u32 pcs_intr;
 	bool intr_en;
 	bool sgmii_2p5g_en;
 	bool fixed_phy_mode;
@@ -64,6 +64,8 @@ int qcom_xpcs_intr_enable(struct dw_xpcs_qcom *xpcs);
 irqreturn_t ethqos_xpcs_isr(int irq, void *dev_data);
 int ethqos_xpcs_intr_config(struct net_device *ndev);
 int ethqos_xpcs_intr_enable(struct net_device *ndev);
+void ethqos_xpcs_irq_enable(struct net_device *ndev);
+void ethqos_xpcs_irq_disable(struct net_device *ndev);
 int ethqos_xpcs_init(struct net_device *ndev);
 int qcom_xpcs_verify_lnk_status_usxgmii(struct dw_xpcs_qcom *xpcs);
 int qcom_xpcs_verify_an(struct dw_xpcs_qcom *xpcs);
@@ -157,7 +159,12 @@ static inline int ethqos_xpcs_intr_enable(struct net_device *ndev)
 {
 	return -EINVAL;
 }
-
+static inline void ethqos_xpcs_irq_enable(struct net_device *ndev)
+{
+}
+static inline void ethqos_xpcs_irq_disable(struct net_device *ndev)
+{
+}
 static inline int ethqos_xpcs_init(struct net_device *ndev)
 {
 	return 0;
