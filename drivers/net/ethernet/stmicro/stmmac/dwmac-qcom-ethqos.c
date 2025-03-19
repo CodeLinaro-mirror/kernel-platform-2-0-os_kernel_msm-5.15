@@ -7491,14 +7491,20 @@ int qcom_ethqos_bring_up_phy_if(struct device *dev, bool client_mode)
 		}
 	}
 	if (priv->plat->interface ==  PHY_INTERFACE_MODE_USXGMII) {
+		rtnl_lock();
 		if (netif_running(ndev)) {
 			ret = ndev->netdev_ops->ndo_stop(ndev);
-			if (ret)
+			if (ret) {
+				rtnl_unlock();
 				goto error;
+			}
 			ret = ndev->netdev_ops->ndo_open(ndev);
-			if (ret)
+			if (ret) {
+				rtnl_unlock();
 				goto error;
+			}
 		}
+		rtnl_unlock();
 	}
 
 	return ret;
