@@ -1256,8 +1256,6 @@ static int mhi_queue(struct mhi_device *mhi_dev, struct mhi_buf_info *buf_info,
 	if (unlikely(ret))
 		return ret;
 
-	read_lock_irqsave(&mhi_cntrl->pm_lock, flags);
-
 	/* Let controller mark last busy for runtime PM framework if needed */
 	if (mhi_cntrl->runtime_last_busy)
 		mhi_cntrl->runtime_last_busy(mhi_cntrl);
@@ -1277,9 +1275,6 @@ static int mhi_queue(struct mhi_device *mhi_dev, struct mhi_buf_info *buf_info,
 	if (likely(MHI_DB_ACCESS_VALID(mhi_cntrl)) &&
 	    rsc_ch_ring_db_check(mhi_cntrl, mhi_chan))
 		mhi_ring_chan_db(mhi_cntrl, mhi_chan);
-
-	if (dir == DMA_FROM_DEVICE)
-		mhi_cntrl->runtime_put(mhi_cntrl);
 
 	read_unlock_irqrestore(&mhi_cntrl->pm_lock, flags);
 
