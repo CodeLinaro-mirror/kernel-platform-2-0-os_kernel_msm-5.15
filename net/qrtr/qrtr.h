@@ -1,4 +1,6 @@
-/* SPDX-License-Identifier: GPL-2.0 */
+/* SPDX-License-Identifier: GPL-2.0-only
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ */
 #ifndef __QRTR_H_
 #define __QRTR_H_
 
@@ -39,6 +41,25 @@ struct qrtr_array {
 	size_t size;
 };
 
+/**
+ * struct qrtr_cb - struct to store pkt info
+ * @src_node: source node of the pkt
+ * @src_port: source port of the pkt
+ * @dst_node: destination node of the pkt
+ * @dst_port: destination port of the pkt
+ * @type: type of the pkt
+ * @confirm_rx: flag to indicate low watermark exceeded
+ */
+struct qrtr_cb {
+	u32 src_node;
+	u32 src_port;
+	u32 dst_node;
+	u32 dst_port;
+
+	u8 type;
+	u8 confirm_rx;
+};
+
 int qrtr_endpoint_register(struct qrtr_endpoint *ep, unsigned int net_id,
 			   bool rt, struct qrtr_array *no_wake);
 
@@ -57,4 +78,21 @@ int qrtr_get_service_id(unsigned int node_id, unsigned int port_id);
 void qrtr_print_wakeup_reason(const void *data);
 
 int qrtr_get_header_size(const void *data);
+
+#ifdef CONFIG_QRTR_WAKEUP_INFO
+int qrtr_wakeup_info_init(void);
+void qrtr_wakeup_info_exit(void);
+void qrtr_save_wakeup_reason(u64 preview, struct qrtr_cb cb, int pid, char *name,
+			     int service_id);
+#else
+static inline int qrtr_wakeup_info_init(void)
+{
+	return 0;
+}
+
+static inline void qrtr_wakeup_info_exit(void) { }
+static inline void qrtr_save_wakeup_reason(u64 preview, struct qrtr_cb cb, int pid, char *name,
+					   int service_id)
+{ }
+#endif /*CONFIG_QRTR_WAKEUP_INFO*/
 #endif

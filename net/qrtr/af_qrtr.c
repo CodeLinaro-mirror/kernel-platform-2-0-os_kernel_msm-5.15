@@ -108,16 +108,6 @@ struct qrtr_hdr_v2 {
 
 #define QRTR_FLAGS_CONFIRM_RX	BIT(0)
 
-struct qrtr_cb {
-	u32 src_node;
-	u32 src_port;
-	u32 dst_node;
-	u32 dst_port;
-
-	u8 type;
-	u8 confirm_rx;
-};
-
 #define QRTR_HDR_MAX_SIZE max_t(size_t, sizeof(struct qrtr_hdr_v1), \
 					sizeof(struct qrtr_hdr_v2))
 
@@ -520,6 +510,11 @@ void qrtr_print_wakeup_reason(const void *data)
 		snprintf(log_info, sizeof(log_info), "Invalid packet received");
 		break;
 	}
+
+	if (!ipc || cb.dst_node != qrtr_local_nid)
+		qrtr_save_wakeup_reason(preview, cb, -1, "NULL", service_id);
+	else
+		qrtr_save_wakeup_reason(preview, cb, ipc->pid, ipc->comm, service_id);
 
 	pr_info("%s: %s\n", __func__, log_info);
 }
@@ -2696,7 +2691,9 @@ static int __init qrtr_proto_init(void)
 		goto err_sock;
 
 	qrtr_backup_init();
-
+	rc = qrtr_wakeup_info_init();
+	if (rc)
+		pr_err("%s: Failed to initialize QRTR wakeup info driver\n", __func__);
 	return 0;
 
 err_sock:
@@ -2714,6 +2711,7 @@ static void __exit qrtr_proto_fini(void)
 	proto_unregister(&qrtr_proto);
 
 	qrtr_backup_deinit();
+	qrtr_wakeup_info_exit();
 }
 module_exit(qrtr_proto_fini);
 
