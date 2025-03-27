@@ -1091,7 +1091,7 @@ static int qcom_ethqos_add_ipv6addr(struct ip_params *ip_info,
 	if (!net->ipv6.devconf_dflt) {
 		ETHQOSERR("ipv6.devconf_dflt is null, schedule wq\n");
 		schedule_delayed_work(&ethqos->ipv6_addr_assign_wq,
-				      msecs_to_jiffies(1000));
+				      msecs_to_jiffies(100));
 		return ret;
 	}
 	memset(&ir6, 0, sizeof(ir6));
@@ -3399,9 +3399,6 @@ static void ethqos_is_ipv6_NW_stack_ready(struct work_struct *work)
 	ret = qcom_ethqos_add_ipv6addr(&pparams, ndev);
 	if (ret)
 		return;
-
-	cancel_delayed_work_sync(&ethqos->ipv6_addr_assign_wq);
-	flush_delayed_work(&ethqos->ipv6_addr_assign_wq);
 }
 
 static void ethqos_set_early_eth_param(struct stmmac_priv *priv,
@@ -3426,7 +3423,7 @@ static void ethqos_set_early_eth_param(struct stmmac_priv *priv,
 		ret = qcom_ethqos_add_ipv6addr(&pparams, priv->dev);
 		if (ret)
 			schedule_delayed_work(&ethqos->ipv6_addr_assign_wq,
-					      msecs_to_jiffies(1000));
+					      msecs_to_jiffies(100));
 	}
 
 	return;
