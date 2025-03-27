@@ -492,9 +492,9 @@ static int stmmac_ethtool_get_regs_len(struct net_device *dev)
 	struct stmmac_priv *priv = netdev_priv(dev);
 
 	if (priv->plat->has_xgmac)
-		return XGMAC_REGSIZE * 4;
+		return XGMAC_REGSIZE * 4 * sizeof(u32);
 	else if (priv->plat->has_gmac4)
-		return GMAC4_REG_SPACE_SIZE;
+		return GMAC4_REG_SPACE_SIZE * sizeof(u32);
 	return REG_SPACE_SIZE;
 }
 

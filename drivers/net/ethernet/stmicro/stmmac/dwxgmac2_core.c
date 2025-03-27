@@ -331,8 +331,10 @@ static void dwxgmac2_dump_regs(struct mac_device_info *hw, u32 *reg_space)
 {
 	void __iomem *ioaddr = hw->pcsr;
 	int i;
+	u32 hw_cap = readl(ioaddr + XGMAC_HW_FEATURE2);
+	int number_rx_queues = ((hw_cap & XGMAC_HWFEAT_RXQCNT) >> 0) + 1;
 
-	for (i = 0; i < XGMAC_MAC_REGSIZE; i++)
+	for (i = 0; i < (XGMAC_MTL_QINT_STATUS(number_rx_queues) / 4); i++)
 		reg_space[i] = readl(ioaddr + i * 4);
 }
 
