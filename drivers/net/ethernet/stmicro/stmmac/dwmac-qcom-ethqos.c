@@ -3685,6 +3685,7 @@ static void ethqos_rgmii_io_macro_loopback(struct qcom_ethqos *ethqos, int mode)
 
 static void ethqos_mac_loopback(struct qcom_ethqos *ethqos, int mode)
 {
+	struct stmmac_priv *priv = qcom_ethqos_get_priv(ethqos);
 	u32 read_value = (u32)readl_relaxed(ethqos->ioaddr + XGMAC_RX_CONFIG);
 	/* Set loopback mode */
 	if (mode == 1)
@@ -3698,22 +3699,52 @@ static void ethqos_mac_loopback(struct qcom_ethqos *ethqos, int mode)
 	if (ethqos->emac_ver == EMAC_HW_v4_0_0) {
 		if (mode == 1)
 			qcom_scm_call_loopback_configure(ethqos->rgmii_phy_base,
-							 ENABLE_MAC_LOOPBACK, 0);
+							 ENABLE_MAC_LOOPBACK,
+							 priv->plat->interface);
 		else
 			qcom_scm_call_loopback_configure(ethqos->rgmii_phy_base,
-							 DISABLE_LOOPBACK, 0);
-
+							 DISABLE_LOOPBACK,
+							 priv->plat->interface);
 		return;
 	}
 #endif
 
 	if (mode == 1) {
-		rgmii_updatel(ethqos, RGMII_CONFIG_LOOPBACK_EN,
-			      RGMII_CONFIG_LOOPBACK_EN,
-			      RGMII_IO_MACRO_CONFIG);
+		switch (priv->plat->interface) {
+		case PHY_INTERFACE_MODE_RGMII:
+		case PHY_INTERFACE_MODE_RGMII_ID:
+		case PHY_INTERFACE_MODE_RGMII_RXID:
+		case PHY_INTERFACE_MODE_RGMII_TXID:
+			rgmii_updatel(ethqos, RGMII_CONFIG_LOOPBACK_EN,
+				      RGMII_CONFIG_LOOPBACK_EN,
+				      RGMII_IO_MACRO_CONFIG);
+			break;
+		case PHY_INTERFACE_MODE_SGMII:
+		case PHY_INTERFACE_MODE_2500BASEX:
+		case PHY_INTERFACE_MODE_5GBASER:
+		case PHY_INTERFACE_MODE_USXGMII:
+			rgmii_updatel(ethqos, SGMII_PHY_CNTRL1_SGMII_TX_TO_RX_LOOPBACK_EN,
+				      SGMII_PHY_CNTRL1_SGMII_TX_TO_RX_LOOPBACK_EN,
+				      EMAC_WRAPPER_SGMII_PHY_CNTRL1);
+			break;
+		}
 	} else {
-		rgmii_updatel(ethqos, RGMII_CONFIG_LOOPBACK_EN,
-			      0, RGMII_IO_MACRO_CONFIG);
+		switch (priv->plat->interface) {
+		case PHY_INTERFACE_MODE_RGMII:
+		case PHY_INTERFACE_MODE_RGMII_ID:
+		case PHY_INTERFACE_MODE_RGMII_RXID:
+		case PHY_INTERFACE_MODE_RGMII_TXID:
+			rgmii_updatel(ethqos, RGMII_CONFIG_LOOPBACK_EN,
+				      0, RGMII_IO_MACRO_CONFIG);
+			break;
+		case PHY_INTERFACE_MODE_SGMII:
+		case PHY_INTERFACE_MODE_2500BASEX:
+		case PHY_INTERFACE_MODE_5GBASER:
+		case PHY_INTERFACE_MODE_USXGMII:
+			rgmii_updatel(ethqos, SGMII_PHY_CNTRL1_SGMII_TX_TO_RX_LOOPBACK_EN,
+				      0, EMAC_WRAPPER_SGMII_PHY_CNTRL1);
+			break;
+		}
 	}
 }
 
