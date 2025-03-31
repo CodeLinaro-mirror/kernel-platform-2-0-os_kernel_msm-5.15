@@ -194,7 +194,7 @@ config CFG80211_DEBUGFS
 	  If unsure, say N.
 
 config CFG80211_CRDA_SUPPORT
-	bool "support CRDA" if EXPERT
+	bool "support CRDA"
 	default y
 	help
 	  You should enable this option unless you know for sure you have no
