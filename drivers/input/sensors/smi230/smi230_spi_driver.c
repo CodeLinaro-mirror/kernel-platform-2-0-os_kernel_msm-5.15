@@ -202,6 +202,38 @@ static void smi230_acc_spi_remove(struct spi_device *device)
 }
 #endif
 
+static void smi230_acc_spi_shutdown(struct device *dev)
+{
+	smi230_acc_shutdown(dev);
+}
+
+static int __maybe_unused smi230_acc_spi_suspend(struct device *dev)
+{
+	return smi230_acc_suspend(dev);
+}
+
+static int __maybe_unused smi230_acc_spi_resume(struct device *dev)
+{
+	return smi230_acc_resume(dev);
+}
+
+static int __maybe_unused smi230_acc_spi_freeze(struct device *dev)
+{
+	return smi230_acc_freeze(dev);
+}
+
+static int __maybe_unused smi230_acc_spi_restore(struct device *dev)
+{
+	return smi230_acc_restore(dev);
+}
+
+static const struct dev_pm_ops smi230_acc_spi_pm_ops = {
+	.suspend = smi230_acc_spi_suspend,
+	.resume = smi230_acc_spi_resume,
+	.freeze = smi230_acc_spi_freeze,
+	.restore = smi230_acc_spi_restore,
+};
+
 static const struct spi_device_id smi230_acc_id[] = { { SENSOR_ACC_NAME, 0 },
 						      {} };
 MODULE_DEVICE_TABLE(spi, smi230_acc_id);
@@ -219,10 +251,12 @@ static struct spi_driver smi230_acc_driver = {
 		.owner = THIS_MODULE,
 		.name  = SENSOR_ACC_NAME,
 		.of_match_table = smi230_acc_of_match,
+		.pm = &smi230_acc_spi_pm_ops,
+		.shutdown = smi230_acc_spi_shutdown,
 	},
-	.id_table = smi230_acc_id,
 	.probe    = smi230_acc_spi_probe,
 	.remove	= smi230_acc_spi_remove,
+	.id_table = smi230_acc_id,
 };
 #endif
 
@@ -287,6 +321,38 @@ static void smi230_gyro_spi_remove(struct spi_device *device)
 }
 #endif
 
+static void smi230_gyro_spi_shutdown(struct device *dev)
+{
+	smi230_gyro_shutdown(dev);
+}
+
+static int __maybe_unused smi230_gyro_spi_suspend(struct device *dev)
+{
+	return smi230_gyro_suspend(dev);
+}
+
+static int __maybe_unused smi230_gyro_spi_resume(struct device *dev)
+{
+	return smi230_gyro_resume(dev);
+}
+
+static int __maybe_unused smi230_gyro_spi_freeze(struct device *dev)
+{
+	return smi230_gyro_freeze(dev);
+}
+
+static int __maybe_unused smi230_gyro_spi_restore(struct device *dev)
+{
+	return smi230_gyro_restore(dev);
+}
+
+static const struct dev_pm_ops smi230_gyro_spi_pm_ops = {
+	.suspend = smi230_gyro_spi_suspend,
+	.resume = smi230_gyro_spi_resume,
+	.freeze = smi230_gyro_spi_freeze,
+	.restore = smi230_gyro_spi_restore,
+};
+
 static const struct spi_device_id smi230_gyro_id[] = { { SENSOR_GYRO_NAME, 0 },
 						       {} };
 MODULE_DEVICE_TABLE(spi, smi230_gyro_id);
@@ -304,10 +370,12 @@ static struct spi_driver smi230_gyro_driver = {
 		.owner = THIS_MODULE,
 		.name  = SENSOR_GYRO_NAME,
 		.of_match_table = smi230_gyro_of_match,
+		.pm = &smi230_gyro_spi_pm_ops,
+		.shutdown = smi230_gyro_spi_shutdown,
 	},
-	.id_table = smi230_gyro_id,
 	.probe    = smi230_gyro_spi_probe,
 	.remove	= smi230_gyro_spi_remove,
+	.id_table = smi230_gyro_id,
 };
 #endif
 
