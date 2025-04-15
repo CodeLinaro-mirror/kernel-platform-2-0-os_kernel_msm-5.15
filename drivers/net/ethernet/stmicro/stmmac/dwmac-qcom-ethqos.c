@@ -8612,7 +8612,11 @@ static int qcom_ethqos_suspend(struct device *dev)
 	}
 #endif
 
-	ethqos_xpcs_irq_disable(ndev);
+	if (priv->plat->interface == PHY_INTERFACE_MODE_USXGMII ||
+	    priv->plat->interface == PHY_INTERFACE_MODE_SGMII ||
+	    priv->plat->interface == PHY_INTERFACE_MODE_2500BASEX ||
+	    priv->plat->interface == PHY_INTERFACE_MODE_5GBASER)
+		ethqos_xpcs_irq_disable(ndev);
 
 	if (ethqos->current_phy_mode == DISABLE_PHY_AT_SUSPEND_ONLY ||
 	    ethqos->current_phy_mode == DISABLE_PHY_SUSPEND_ENABLE_RESUME) {
@@ -8762,7 +8766,11 @@ static int qcom_ethqos_resume(struct device *dev)
 
 	ret = stmmac_resume(dev);
 
-	ethqos_xpcs_irq_enable(ndev);
+	if (priv->plat->interface == PHY_INTERFACE_MODE_USXGMII ||
+	    priv->plat->interface == PHY_INTERFACE_MODE_SGMII ||
+	    priv->plat->interface == PHY_INTERFACE_MODE_2500BASEX ||
+	    priv->plat->interface == PHY_INTERFACE_MODE_5GBASER)
+		ethqos_xpcs_irq_enable(ndev);
 
 	if (ethqos->current_phy_mode == DISABLE_PHY_SUSPEND_ENABLE_RESUME) {
 		ETHQOSINFO("reset phy after clock\n");
