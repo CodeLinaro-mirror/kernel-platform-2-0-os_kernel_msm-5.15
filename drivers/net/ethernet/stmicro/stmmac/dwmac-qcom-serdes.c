@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 
-/* Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved. */
+/* Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved. */
 
 #include <linux/delay.h>
 #include <linux/module.h>
@@ -85,6 +85,19 @@ err_ret:
 	ETHQOSERR("Serdes phy soft reset failed\n");
 }
 EXPORT_SYMBOL_GPL(qcom_ethqos_serdes_phy_soft_reset);
+
+void qcom_ethqos_serdes_power_down(struct qcom_ethqos *ethqos)
+{
+	writel_relaxed(0x08, ethqos->sgmii_base + SGMII_PHY_PCS_TX_MID_TERM_CTRL2);
+	writel_relaxed(0x01, ethqos->sgmii_base + SGMII_PHY_PCS_SW_RESET);
+	usleep_range(100, 200);
+	writel_relaxed(0x00, ethqos->sgmii_base + SGMII_PHY_PCS_SW_RESET);
+	writel_relaxed(0x01, ethqos->sgmii_base + SGMII_PHY_PCS_PHY_START);
+	writel_relaxed(0x0, ethqos->sgmii_base + SGMII_PHY_PCS_POWER_DOWN_CONTROL);
+
+	/* Set current speed to 0 so that serdes will be reprogrammed on next link up. */
+	ethqos->curr_serdes_speed = 0;
+}
 
 void qcom_ethqos_serdes_soft_reset(struct qcom_ethqos *ethqos)
 {

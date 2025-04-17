@@ -6175,12 +6175,20 @@ static int ethqos_serdes_power_saving(struct net_device *ndev, void *priv,
 			if (ret < 0)
 				return ret;
 
+			ret = qcom_ethqos_enable_serdes_clocks(ethqos);
+			if (ret)
+				return -EINVAL;
+
 			if (needs_serdes_reset)
 				qcom_ethqos_serdes_soft_reset(ethqos);
 
 			ETHQOSINFO("power saving turned off\n");
 		}
 	} else {
+		qcom_ethqos_serdes_power_down(ethqos);
+
+		qcom_ethqos_disable_serdes_clocks(ethqos);
+
 		if (ethqos->vreg_a_sgmii_1p2 && ethqos->vreg_a_sgmii_0p9) {
 			ret = ethqos_disable_serdes_consumers(ethqos);
 			if (ret < 0)
