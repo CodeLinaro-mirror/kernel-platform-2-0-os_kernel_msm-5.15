@@ -7720,6 +7720,15 @@ static void stmmac_reset_subtask(struct stmmac_priv *priv)
 	while (test_and_set_bit(STMMAC_RESETING, &priv->state))
 		usleep_range(1000, 2000);
 
+	if (priv->dev->irq > 0)
+		disable_irq(priv->dev->irq);
+
+	if (priv->wol_irq > 0 && priv->wol_irq != priv->dev->irq)
+		disable_irq(priv->wol_irq);
+
+	if (priv->lpi_irq > 0 && priv->lpi_irq != priv->dev->irq)
+		disable_irq(priv->lpi_irq);
+
 	set_bit(STMMAC_DOWN, &priv->state);
 	stmmac_stop_all_dma(priv);
 	stmmac_flush_mtl_tx(priv);
