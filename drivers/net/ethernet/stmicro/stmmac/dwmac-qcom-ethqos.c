@@ -330,6 +330,9 @@ MODULE_PARM_DESC(eiface, "Interface type from ethernet partition");
 static char *eqos;
 module_param(eqos, charp, 0600);
 MODULE_PARM_DESC(eqos, "QOS Config support from ethernet partition");
+static char *ewait_switch_rdy;
+module_param(ewait_switch_rdy, charp, 0600);
+MODULE_PARAM_DESC(ewait_switch_rdy, "Link up delay option from ethernet partition");
 #endif
 
 static bool qos_use_skprio;
@@ -902,6 +905,17 @@ static int set_ethernet_qos_cfg(char *qoscfg)
 	return 0;
 }
 
+static int set_ethernet_wait_switch_rdy(char *eth_wait_switch_rdy)
+{
+	if (!eth_wait_switch_rdy || strlen(eth_wait_switch_rdy) == 0)
+		return -EINVAL;
+
+	if (kstrtobool(eth_wait_switch_rdy, &mparams.wait_switch_rdy))
+		return -EINVAL;
+
+	return 0;
+}
+
 #ifndef MODULE
 static int __init set_early_ethernet_ipv4_static(char *ipv4_addr_in)
 {
@@ -976,6 +990,17 @@ static int __init set_ethernet_qoscfg_static(char *eth_qos)
 
 __setup("eqos=", set_ethernet_qoscfg_static);
 
+static int __init set_ethernet_wait_switch_rdy_static(char *eth_wait_switch_rdy)
+{
+	int ret = -EINVAL;
+
+	ret = set_ethernet_wait_switch_rdy(eth_wait_switch_rdy);
+	if (ret)
+		mparams.wait_switch_rdy = false;
+	return 0;
+}
+
+__setup("ewait_switch_rdy=", set_ethernet_wait_switch_rdy_static);
 #endif
 
 static int qcom_ethqos_add_ipaddr(struct ip_params *ip_info,
@@ -6707,6 +6732,9 @@ static int ethqos_fixed_link_check(struct platform_device *pdev)
 
 out:
 	if (plat_dat->fixed_phy_mode) {
+		// Set plat_wait_for_emac_rx_clk_en,
+		// dtsi will overwrite configuration from emac partition
+		plat_dat->plat_wait_for_emac_rx_clk_en = mparams.wait_switch_rdy;
 		of_property_read_u32(np, "wait_for_rx_clk_rdy",
 				     &plat_dat->plat_wait_for_emac_rx_clk_en);
 		plat_dat->fixed_phy_mode_needs_mdio = of_property_read_bool(np,
@@ -7835,6 +7863,9 @@ static int ethqos_set_early_eth_params(void)
 
 	if (eqos)
 		ret = set_ethernet_qos_cfg(eqos);
+
+	if (ewait_switch_rdy)
+		ret = set_ethernet_wait_switch_rdy(ewait_switch_rdy);
 
 	return ret;
 }
