@@ -57,6 +57,9 @@ static struct poweroff_reason reasons[] = {
 #endif
 #ifdef CONFIG_POWER_RESET_QCOM_REBOOT_REASON_BOOTPARAM
 	{ "admin-trigger",		0x09 },
+	{ "user",			0x0A },
+	{ "system-normal",		0x0B },
+	{ "system-abnormal",		0x0C },
 #endif
 #ifdef CONFIG_FIRMWARE_FAIL_SAFE
 	{ "firmware auth failed",       0x0E },
@@ -200,7 +203,7 @@ static ssize_t bootparam_show(struct kobject *bootparam_kobj,
 				struct attribute *this,
 				char *buf)
 {
-	const char *reset_reason = "normal";
+	const char *reset_reason = "unknown";
 	struct poweroff_reason *iter;
 
 	for (iter = reasons; iter->pon_reason; iter++) {
@@ -252,9 +255,10 @@ static int qcom_reboot_reason_reboot(struct notifier_block *this,
 	char *cmd = ptr;
 	struct qcom_reboot_reason *reboot = container_of(this,
 		struct qcom_reboot_reason, reboot_nb);
+	char *reason_user = "user";
 
 	if (!cmd)
-		return NOTIFY_OK;
+		cmd = reason_user;
 
 	write_reset_reason(cmd, reboot->nvmem_cell);
 
