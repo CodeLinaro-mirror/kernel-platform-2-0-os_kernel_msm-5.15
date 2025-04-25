@@ -6654,3 +6654,5 @@
 	espeed=	[KNL] Sets ethernet interface speed at boot.
 
 	eqos=	[KNL] sets qos config at boot
+
+	ewait_switch_rdy=	[KNL] Sets wait for peer side switch ready before link up at boot up.
