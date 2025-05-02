@@ -19,7 +19,7 @@
 #include "stmmac.h"
 #include "dwxgmac2.h"
 
-#define PTP_LIMIT 100000
+#define PTP_LIMIT 100
 
 static void config_hw_tstamping(void __iomem *ioaddr, u32 data)
 {
