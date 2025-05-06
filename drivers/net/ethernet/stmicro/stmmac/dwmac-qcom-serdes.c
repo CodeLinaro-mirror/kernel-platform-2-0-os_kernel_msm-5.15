@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 
-/* Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved. */
+// Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
 
 #include <linux/delay.h>
 #include <linux/module.h>
@@ -826,7 +826,8 @@ static int qcom_ethqos_serdes_sgmii_2p5Gb(struct qcom_ethqos *ethqos)
 	writel_relaxed(0x83, ethqos->sgmii_base + QSERDES_PCS_TX_MID_TERM_CTRL1);
 	writel_relaxed(0x08, ethqos->sgmii_base + QSERDES_PCS_TX_MID_TERM_CTRL2);
 
-	writel_relaxed(0x00, ethqos->sgmii_base + QSERDES_RX0_SIGDET_CAL_CTRL1);
+	writel_relaxed(0x10, ethqos->sgmii_base + QSERDES_RX0_SIGDET_CAL_CTRL1);
+	writel_relaxed(0x77, ethqos->sgmii_base + QSERDES_PCS_RX_SIGDET_CTRL2);
 	writel_relaxed(0x00, ethqos->sgmii_base + QSERDES_RX0_SIGDET_CAL_CTRL2_AND_CDR_LOCK_EDGE);
 	writel_relaxed(0x00, ethqos->sgmii_base + QSERDES_PCS_SGMII_MISC_CTRL7);
 	writel_relaxed(0x8c, ethqos->sgmii_base + QSERDES_PCS_SGMII_MISC_CTRL8);
@@ -1011,6 +1012,7 @@ static int qcom_ethqos_serdes_usxgmii_2p5Gb(struct qcom_ethqos *ethqos)
 	writel_relaxed(0x08, ethqos->sgmii_base + QSERDES_PCS_TX_MID_TERM_CTRL2);
 
 	writel_relaxed(0x00, ethqos->sgmii_base + QSERDES_RX0_SIGDET_CAL_CTRL1);
+	writel_relaxed(0xCC, ethqos->sgmii_base + QSERDES_PCS_RX_SIGDET_CTRL2);
 	writel_relaxed(0x00, ethqos->sgmii_base + QSERDES_RX0_SIGDET_CAL_CTRL2_AND_CDR_LOCK_EDGE);
 	writel_relaxed(0x00, ethqos->sgmii_base + QSERDES_PCS_SGMII_MISC_CTRL7);
 	writel_relaxed(0x14, ethqos->sgmii_base + QSERDES_PCS_SGMII_MISC_CTRL8);
@@ -1193,6 +1195,7 @@ static int qcom_ethqos_serdes_usxgmii_5Gb(struct qcom_ethqos *ethqos)
 	writel_relaxed(0x08, ethqos->sgmii_base + QSERDES_PCS_TX_MID_TERM_CTRL2);
 
 	writel_relaxed(0x00, ethqos->sgmii_base + QSERDES_RX0_SIGDET_CAL_CTRL1);
+	writel_relaxed(0xCC, ethqos->sgmii_base + QSERDES_PCS_RX_SIGDET_CTRL2);
 	writel_relaxed(0x00, ethqos->sgmii_base + QSERDES_RX0_SIGDET_CAL_CTRL2_AND_CDR_LOCK_EDGE);
 	writel_relaxed(0x00, ethqos->sgmii_base + QSERDES_PCS_SGMII_MISC_CTRL7);
 	writel_relaxed(0x14, ethqos->sgmii_base + QSERDES_PCS_SGMII_MISC_CTRL8);
@@ -1375,6 +1378,7 @@ static int qcom_ethqos_serdes_usxgmii_10Gb_1Gb(struct qcom_ethqos *ethqos)
 	writel_relaxed(0x08, ethqos->sgmii_base + QSERDES_PCS_TX_MID_TERM_CTRL2);
 
 	writel_relaxed(0x00, ethqos->sgmii_base + QSERDES_RX0_SIGDET_CAL_CTRL1);
+	writel_relaxed(0xCC, ethqos->sgmii_base + QSERDES_PCS_RX_SIGDET_CTRL2);
 	writel_relaxed(0x00, ethqos->sgmii_base + QSERDES_RX0_SIGDET_CAL_CTRL2_AND_CDR_LOCK_EDGE);
 	writel_relaxed(0x00, ethqos->sgmii_base + QSERDES_PCS_SGMII_MISC_CTRL7);
 	writel_relaxed(0x14, ethqos->sgmii_base + QSERDES_PCS_SGMII_MISC_CTRL8);
