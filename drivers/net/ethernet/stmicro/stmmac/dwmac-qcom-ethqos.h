@@ -637,6 +637,7 @@ struct mac_params {
 	unsigned int link_speed;
 	char qoscfg_name[4];
 	bool wait_switch_rdy;
+	bool c37_an_en;
 };
 
 int qcom_ethqos_bring_down_phy_if(struct device *dev);

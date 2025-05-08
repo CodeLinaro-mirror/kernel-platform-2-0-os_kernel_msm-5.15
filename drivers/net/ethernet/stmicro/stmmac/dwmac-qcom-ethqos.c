@@ -333,6 +333,9 @@ MODULE_PARM_DESC(eqos, "QOS Config support from ethernet partition");
 static char *ewait_switch_rdy;
 module_param(ewait_switch_rdy, charp, 0600);
 MODULE_PARAM_DESC(ewait_switch_rdy, "Link up delay option from ethernet partition");
+static char *eautoneg;
+module_param(eautoneg, charp, 0600);
+MODULE_PARAM_DESC(eautoneg, "Autonegotiation enablement option from ethernet partition");
 #endif
 
 static bool qos_use_skprio;
@@ -355,7 +358,14 @@ void *ipc_stmmac_log_ctxt;
 void *ipc_stmmac_log_ctxt_low;
 int stmmac_enable_ipc_low;
 static struct ip_params pparams;
-static struct mac_params mparams = {0};
+static struct mac_params mparams = {
+	.eth_intf = PHY_INTERFACE_MODE_NA,
+	.is_valid_eth_intf = false,
+	.link_speed = 0,
+	.qoscfg_name = "",
+	.wait_switch_rdy = false,
+	.c37_an_en = true
+};
 long phyaddr_pt_param = -1;
 
 #define RX_CLK_SYSFS_DEV_ATTR_PERMS 0644
@@ -916,6 +926,16 @@ static int set_ethernet_wait_switch_rdy(char *eth_wait_switch_rdy)
 	return 0;
 }
 
+static int set_ethernet_autoneg(char *eth_autoneg)
+{
+	if (!eth_autoneg || strlen(eth_autoneg) == 0)
+		return -EINVAL;
+
+	if (kstrtobool(eth_autoneg, &mparams.c37_an_en))
+		return -EINVAL;
+	return 0;
+}
+
 #ifndef MODULE
 static int __init set_early_ethernet_ipv4_static(char *ipv4_addr_in)
 {
@@ -1001,6 +1021,17 @@ static int __init set_ethernet_wait_switch_rdy_static(char *eth_wait_switch_rdy)
 }
 
 __setup("ewait_switch_rdy=", set_ethernet_wait_switch_rdy_static);
+
+static int __init set_ethernet_autoneg_static(char *eth_autoneg)
+{
+	int ret = -EINVAL;
+
+	ret = set_ethernet_autoneg(eth_autoneg);
+	if (ret)
+		mparams.c37_an_en = true;	// C37 AN is enabled by default
+	return 0;
+}
+__setup("eautoneg=", set_ethernet_autoneg_static);
 #endif
 
 static int qcom_ethqos_add_ipaddr(struct ip_params *ip_info,
@@ -6739,6 +6770,7 @@ out:
 				     &plat_dat->plat_wait_for_emac_rx_clk_en);
 		plat_dat->fixed_phy_mode_needs_mdio = of_property_read_bool(np,
 									    "fixed-link-needs-mdio-bus");
+		plat_dat->c37_an_en = mparams.c37_an_en;
 	}
 
 	of_node_put(fixed_phy_node);
@@ -7875,6 +7907,8 @@ static int ethqos_set_early_eth_params(void)
 	if (ewait_switch_rdy)
 		ret = set_ethernet_wait_switch_rdy(ewait_switch_rdy);
 
+	if (eautoneg)
+		ret = set_ethernet_autoneg(eautoneg);
 	return ret;
 }
 #endif

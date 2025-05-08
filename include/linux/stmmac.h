@@ -361,6 +361,7 @@ struct plat_stmmacenet_data {
 	bool fixed_phy_mode_needs_mdio;
 	bool crc_strip_en;
 	bool rx_clk_rdy;
+	bool c37_an_en;
 	bool mac_err_rec;
 	bool mdio_op_busy;
 	atomic_t phy_clks_suspended;

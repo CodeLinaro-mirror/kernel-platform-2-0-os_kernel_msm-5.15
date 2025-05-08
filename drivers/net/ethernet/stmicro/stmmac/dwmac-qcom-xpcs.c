@@ -152,9 +152,12 @@ int ethqos_xpcs_init(struct net_device *ndev)
 	if (priv->plat->fixed_phy_mode && priv->hw->qxpcs)
 		priv->hw->qxpcs->fixed_phy_mode = true;
 
-	priv->hw->qxpcs->c37_an_en = of_property_read_bool(ethqos->pdev->dev.of_node,
-							   "c37-autoneg-en");
-
+	/* priv->plat->c37_an_en is set from emac partition.
+	 * It can be set to false if device tree property exists
+	 */
+	if (of_property_read_bool(ethqos->pdev->dev.of_node, "qcom,xpcs_autoneg_disabled"))
+		priv->plat->c37_an_en = false;
+	priv->hw->qxpcs->c37_an_en = priv->plat->c37_an_en;
 	if (!priv->plat->fixed_phy_mode || !priv->hw->qxpcs->c37_an_en) {
 		ETHQOSINFO("Mac2mac or c37 auto-neg is not enabled, using non-interrupt mode\n");
 	} else {
