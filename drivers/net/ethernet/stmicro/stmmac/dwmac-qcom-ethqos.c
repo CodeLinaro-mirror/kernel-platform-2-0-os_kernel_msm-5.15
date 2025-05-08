@@ -7427,7 +7427,9 @@ int qcom_ethqos_bring_up_phy_if(struct device *dev, bool client_mode)
 	}
 
 	if (!priv->plat->mac2mac_en && !priv->plat->fixed_phy_mode) {
-		if (priv->plat->interface ==  PHY_INTERFACE_MODE_USXGMII && !priv->plat->mac2mac_en)
+		if (priv->phydev->drv->get_features &&
+		    priv->plat->interface ==  PHY_INTERFACE_MODE_USXGMII &&
+		    !priv->plat->mac2mac_en)
 			priv->phydev->drv->get_features(priv->phydev);
 
 		if (!priv->plat->mac2mac_en) {
