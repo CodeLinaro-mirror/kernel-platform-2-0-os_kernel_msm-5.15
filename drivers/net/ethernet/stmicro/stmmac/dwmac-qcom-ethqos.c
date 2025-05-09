@@ -61,7 +61,6 @@
 #define TN_SYSFS_DEV_ATTR_PERMS 0644
 #define ETH_RTK_PHY_ID_RTL8261N 0x001CCAF3
 #define EFUSE_MAC_ADDR_MASK 16
-#define ETHQOS_SGMII1G_USXGMII5G_10G 0x83
 
 static void ethqos_rgmii_io_macro_loopback(struct qcom_ethqos *ethqos,
 					   int mode);
@@ -7418,25 +7417,29 @@ int qcom_ethqos_bring_up_phy_if(struct device *dev, bool client_mode)
 								 TIMEOUT);
 				if (ret < 0)
 					goto error;
+				goto phy_state_down;
 			} else if (ethqos->peer_resp >= FAILED) {
 				ret = ethqos_send_netlink_socket(data,
 								 THERM_NEW_LOCAL_ETH_MODE_UPDATE,
 								 FAIL);
 				if (ret < 0)
 					goto error;
-			} else if (ethqos->peer_cap != ETHQOS_SGMII1G_USXGMII5G_10G) {
+				goto phy_state_down;
+			} else if (ethqos->peer_cap != SGMII_1G &&
+				   ethqos->peer_cap != USXGMII_5G &&
+				   ethqos->peer_cap != USXGMII_10G &&
+				   ethqos->peer_cap != (SGMII_1G | USXGMII_5G) &&
+				   ethqos->peer_cap != (SGMII_1G | USXGMII_10G) &&
+				   ethqos->peer_cap != (USXGMII_5G | USXGMII_10G) &&
+				   ethqos->peer_cap != (SGMII_1G | USXGMII_5G | USXGMII_10G)) {
 				ret = ethqos_send_netlink_socket(data,
 								 THERM_NEW_LOCAL_ETH_MODE_UPDATE,
 								 INVALID_SPEED);
 				if (ret < 0)
-					return -1;
+					goto error;
+				goto phy_state_down;
 			}
 
-			if (ethqos->peer_resp >= FAILED ||
-			    ethqos->peer_cap != ETHQOS_SGMII1G_USXGMII5G_10G) {
-				ethqos->curr_phy_state = ETHQOS_PHY_STATE_DOWN;
-				return 0;
-			}
 			ethqos->curr_phy_state = ETHQOS_PHY_STATE_UP;
 		}
 		fixed_phy_node = of_get_child_by_name(pdev->dev.of_node, "fixed-link");
@@ -7571,6 +7574,9 @@ int qcom_ethqos_bring_up_phy_if(struct device *dev, bool client_mode)
 error:
 	pr_info("%s %d bring_up failed\n", __func__, __LINE__);
 	return -1;
+phy_state_down:
+	ethqos->curr_phy_state = ETHQOS_PHY_STATE_DOWN;
+	return 0;
 }
 
 int qcom_ethqos_bring_down_phy_if(struct device *dev)
