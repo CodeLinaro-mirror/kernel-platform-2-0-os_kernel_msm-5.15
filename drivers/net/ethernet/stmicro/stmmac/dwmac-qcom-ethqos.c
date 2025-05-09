@@ -8454,8 +8454,12 @@ static int qcom_ethqos_probe(struct platform_device *pdev)
 	qcom_ethmsgq_register_notify(qcom_ethsvm_command_req, priv);
 	atomic_set(&priv->plat->phy_clks_suspended, 0);
 	ethqos_create_sysfs(ethqos);
-	ethqos_change_if_create_sysfs(ethqos);
-	ethqos_thermal_netlink_create_sysfs(ethqos);
+
+	if (plat_dat->phy_interface == PHY_INTERFACE_MODE_USXGMII) {
+		ethqos_change_if_create_sysfs(ethqos);
+		ethqos_thermal_netlink_create_sysfs(ethqos);
+	}
+
 	INIT_WORK(&ethqos->emac_phy_state_work, ethqos_phy_interface_reset);
 	plat_dat->tm_u5g_en = of_property_read_bool(pdev->dev.of_node, "tm-u5g-en");
 
