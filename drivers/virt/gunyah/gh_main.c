@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -216,12 +216,13 @@ void gh_destroy_vcpu(struct gh_vcpu *vcpu)
 void gh_destroy_vm(struct gh_vm *vm)
 {
 	int vcpu_id = 0;
+	int ret = -EINVAL;
 
 	if (vm->status.vm_status == GH_RM_VM_STATUS_NO_STATE)
 		goto clean_vm;
 
-	gh_stop_vm(vm);
-	pr_info("VM:%d ended its execution\n", vm->vmid);
+	ret = gh_stop_vm(vm);
+	pr_info("VM:%d ended its execution, ret =%x\n", vm->vmid, ret);
 
 	while (vm->created_vcpus && vcpu_id < GH_MAX_VCPUS) {
 		if (!vm->vcpus[vcpu_id])
@@ -230,11 +231,13 @@ void gh_destroy_vm(struct gh_vm *vm)
 		vcpu_id++;
 	}
 
-	gh_notify_clients(vm, GH_VM_EARLY_POWEROFF);
+	if (ret == 0)
+		gh_notify_clients(vm, GH_VM_EARLY_POWEROFF);
 	gh_vm_cleanup(vm);
 
 	gh_uevent_notify_change(GH_EVENT_DESTROY_VM, vm);
-	gh_notify_clients(vm, GH_VM_POWEROFF);
+	if (ret == 0)
+		gh_notify_clients(vm, GH_VM_POWEROFF);
 	memset(vm->fw_name, 0, GH_VM_FW_NAME_MAX);
 
 clean_vm:

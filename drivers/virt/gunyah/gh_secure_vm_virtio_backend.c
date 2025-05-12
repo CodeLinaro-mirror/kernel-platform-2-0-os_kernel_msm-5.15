@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/interrupt.h>
@@ -117,6 +117,8 @@ struct virtio_backend_device {
 	/* Page shared with frontend */
 	char __iomem *config_shared_buf;
 	u64  config_shared_size;
+	atomic_t irq_requested;
+	pid_t irq_owner_pid;
 };
 
 static struct virt_machine *find_vm_by_name(const char *vm_name)
@@ -1237,6 +1239,7 @@ VIRTIO_PRINT_MARKER, label);
 		}
 	}
 
+vb_dev->linux_irq = -1;
 	ret = request_irq(linux_irq, vdev_interrupt, 0,
 			vb_dev->int_name, vb_dev);
 	if (ret) {
@@ -1257,7 +1260,8 @@ VIRTIO_PRINT_MARKER, label);
 		vb_dev_put(vb_dev);
 		return -ENOMEM;
 	}
-
+	atomic_set(&vb_dev->irq_requested, 1);
+	vb_dev->irq_owner_pid = task_tgid_vnr(current);
 	vb_dev->linux_irq = linux_irq;
 	vb_dev->cap_id = cap_id;
 	vb_dev->config_shared_size = size;
@@ -1297,9 +1301,10 @@ int gh_virtio_mmio_exit(gh_vmid_t vmid, const char *vm_name)
 		if (refcount)
 			wait_event(vb_dev->notify_queue, !vb_dev->refcount);
 
-		fdput(vb_dev->irq.fd);
-		if (vb_dev->irq.fd.file)
+		if (vb_dev->irq.fd.file) {
+			fdput(vb_dev->irq.fd);
 			vb_dev->irq.fd.file = NULL;
+		}
 		for (i = 0; i < MAX_IO_CONTEXTS; ++i) {
 			if (vb_dev->ioctx[i].ctx) {
 				eventfd_ctx_put(vb_dev->ioctx[i].ctx);
@@ -1310,7 +1315,13 @@ int gh_virtio_mmio_exit(gh_vmid_t vmid, const char *vm_name)
 		free_pages((unsigned long)vb_dev->config_data, 0);
 		vb_dev->config_data = NULL;
 		vb_dev->ack_driver_ok = 0;
-		free_irq(vb_dev->linux_irq, vb_dev);
+		if (vb_dev->irq_owner_pid == task_tgid_vnr(current) &&
+			atomic_cmpxchg(&vb_dev->irq_requested, 1, 0) == 1) {
+			free_irq(vb_dev->linux_irq, vb_dev);
+			vb_dev->linux_irq = -1;
+		}
+
+
 		iounmap(vb_dev->config_shared_buf);
 		vb_dev->config_shared_buf = NULL;
 		spin_lock(&vm->vb_dev_lock);
