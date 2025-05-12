@@ -180,17 +180,25 @@ EXPORT_SYMBOL(qcom_ethqos_serdes_soft_reset);
 
 void qcom_ethqos_disable_serdes_clocks(struct qcom_ethqos *ethqos)
 {
+	if (!ethqos->serdes_clks_en)
+		return;
+
 	if (ethqos->phyaux_clk)
 		clk_disable_unprepare(ethqos->phyaux_clk);
 
 	if (ethqos->sgmiref_clk)
 		clk_disable_unprepare(ethqos->sgmiref_clk);
+
+	ethqos->serdes_clks_en = false;
 }
 EXPORT_SYMBOL(qcom_ethqos_disable_serdes_clocks);
 
 int qcom_ethqos_enable_serdes_clocks(struct qcom_ethqos *ethqos)
 {
 	int ret = 0;
+
+	if (ethqos->serdes_clks_en)
+		return ret;
 
 	if (ethqos->phyaux_clk) {
 		ret = clk_prepare_enable(ethqos->phyaux_clk);
@@ -207,6 +215,8 @@ int qcom_ethqos_enable_serdes_clocks(struct qcom_ethqos *ethqos)
 			return ret;
 		}
 	}
+
+	ethqos->serdes_clks_en = true;
 
 	return ret;
 }

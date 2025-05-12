@@ -588,6 +588,7 @@ struct qcom_ethqos {
 	struct nlmsghdr *nlh;
 	enum EthMode peer_cap;
 	enum EthMode current_mode;
+	bool serdes_clks_en;
 };
 
 struct pps_cfg {
