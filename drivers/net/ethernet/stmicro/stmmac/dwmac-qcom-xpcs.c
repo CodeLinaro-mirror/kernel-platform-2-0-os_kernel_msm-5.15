@@ -159,7 +159,9 @@ int ethqos_xpcs_init(struct net_device *ndev)
 		priv->plat->c37_an_en = false;
 	priv->hw->qxpcs->c37_an_en = priv->plat->c37_an_en;
 	if (!priv->plat->fixed_phy_mode || !priv->hw->qxpcs->c37_an_en) {
-		ETHQOSINFO("Mac2mac or c37 auto-neg is not enabled, using non-interrupt mode\n");
+		ETHQOSINFO("Mac2mac or c37 auto-neg is not enabled, using non-interrupt mode");
+		ETHQOSINFO("fixed_phy_mode=%d, c37_an_en=%d\n",
+			   priv->plat->fixed_phy_mode, priv->plat->c37_an_en);
 	} else {
 		ret = ethqos_xpcs_intr_config(ndev);
 		if (!ret) {

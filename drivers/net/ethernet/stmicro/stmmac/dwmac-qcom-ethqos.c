@@ -6802,7 +6802,6 @@ out:
 				     &plat_dat->plat_wait_for_emac_rx_clk_en);
 		plat_dat->fixed_phy_mode_needs_mdio = of_property_read_bool(np,
 									    "fixed-link-needs-mdio-bus");
-		plat_dat->c37_an_en = mparams.c37_an_en;
 	}
 
 	of_node_put(fixed_phy_node);
@@ -8222,6 +8221,7 @@ static int qcom_ethqos_probe(struct platform_device *pdev)
 #if IS_ENABLED(CONFIG_ETHQOS_QCOM_VER4)
 	plat_dat->enable_power_saving = ethqos_enable_power_saving;
 #endif
+	plat_dat->c37_an_en = mparams.c37_an_en;
 
 	if (of_property_read_bool(pdev->dev.of_node, "qcom,arm-smmu")) {
 		emac_emb_smmu_ctx.pdev_master = pdev;
