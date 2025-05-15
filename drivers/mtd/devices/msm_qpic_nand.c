@@ -3944,6 +3944,68 @@ out:
 }
 
 /*
+ * Function that gets called from this driver to read
+ * only the oob bytes of a page, without the main user data
+ */
+static int msm_nand_read_only_oob_area(struct mtd_info *mtd,
+	loff_t from, struct mtd_oob_ops *ops)
+{
+	struct msm_nand_info *info = mtd->priv;
+	struct msm_nand_chip *chip = &info->nand_chip;
+	struct mtd_oob_ops local_ops;
+	uint32_t i = 0, oob_bytes_per_cw, cwperpage = (mtd->writesize >> 9);
+	int ret;
+	uint8_t *bounce_buf = NULL;
+
+	if (ops->mode == MTD_OPS_AUTO_OOB) {
+		pr_err("unsupported mode %u\n", ops->mode);
+		return -EINVAL;
+	}
+	/*
+	 * Read the page in raw mode (userdata + spare area) into a bounce
+	 * buffer, copy the oob bytes of each codeword from it into the actual
+	 * user buffer and return.
+	 */
+	local_ops = *ops;
+	bounce_buf = kzalloc(mtd->writesize + mtd->oobsize, GFP_KERNEL);
+	if (!bounce_buf)
+		return -ENOMEM;
+
+	local_ops.len = mtd->writesize + mtd->oobsize;
+	local_ops.oobbuf = NULL;
+	local_ops.ooblen = 0;
+	local_ops.datbuf = (uint8_t *)bounce_buf;
+	local_ops.oobretlen = 0;
+
+	if (info->nand_chip.caps & MSM_NAND_CAP_PAGE_SCOPE_READ)
+		ret = msm_nand_read_pagescope(mtd, from, &local_ops);
+	else
+		ret = msm_nand_read_oob(mtd, from, &local_ops);
+
+	if (ret)
+		goto out;
+
+	/*
+	 * For raw reads, we generally read userdata(512) + spare area(20) (13 + 7)
+	 * which is 512 + 20 = 532bytes. i.e chip->cw_size. So, oob data will be
+	 * available from 512bytes of every codeword.
+	 */
+	oob_bytes_per_cw = chip->cw_size - BYTES_512;
+
+	for (i = 0; i < cwperpage; i++) {
+		local_ops.datbuf += chip->cw_size;
+		memcpy(ops->oobbuf, local_ops.datbuf - oob_bytes_per_cw, oob_bytes_per_cw);
+		ops->oobbuf += oob_bytes_per_cw;
+		ops->oobretlen += oob_bytes_per_cw;
+	}
+out:
+	kfree(bounce_buf);
+
+	pr_debug("ops: %d ret: %d oobretlen %u\n", ops->mode, ret, ops->oobretlen);
+	return ret;
+}
+
+/*
  * Function that gets called from upper layers such as MTD/YAFFS2 to read a
  * page.
  */
@@ -3970,6 +4032,13 @@ static int msm_nand_read(struct mtd_info *mtd, loff_t from,
 	 */
 	if (ops.mode == MTD_OPS_PLACE_OOB)
 		ops.mode = MTD_OPS_AUTO_OOB;
+
+	/* handle READOOB ioctl */
+	if (!ops.len && ops.ooblen && ops.oobbuf) {
+		ret = msm_nand_read_only_oob_area(mtd, from, &ops);
+		ops_mtd->oobretlen = ops.oobretlen;
+		goto out;
+	}
 
 	if (!(from & (mtd->writesize - 1)) && !(len % mtd->writesize)) {
 		/*
