@@ -22,7 +22,6 @@
 #include <linux/of_gpio.h>
 #include <linux/regulator/consumer.h>
 #include <linux/of_gpio.h>
-#include <linux/cpu.h>
 
 #include <linux/platform_data/st_sensors_pdata.h>
 
@@ -373,35 +372,6 @@ static const struct iio_chan_spec st_asm330lhhx_temp_channels[] = {
 	IIO_CHAN_SOFT_TIMESTAMP(1),
 };
 
-void st_asm330lhhx_set_cpu_idle_state(bool value)
-{
-	cpu_idle_poll_ctrl(value);
-}
-
-static enum hrtimer_restart st_asm330lhhx_timer_function(
-		struct hrtimer *timer)
-{
-	st_asm330lhhx_set_cpu_idle_state(true);
-
-	return HRTIMER_NORESTART;
-}
-
-void st_asm330lhhx_hrtimer_reset(struct st_asm330lhhx_hw *hw,
-		s64 irq_delta_ts)
-{
-	hrtimer_cancel(&hw->st_asm330lhhx_hrtimer);
-	/* forward HRTIMER just before 1ms of irq arrival */
-	hrtimer_forward(&hw->st_asm330lhhx_hrtimer, ktime_get(),
-			ns_to_ktime(irq_delta_ts - 1000000));
-	hrtimer_restart(&hw->st_asm330lhhx_hrtimer);
-}
-
-static void st_asm330lhhx_hrtimer_init(struct st_asm330lhhx_hw *hw)
-{
-	hrtimer_init(&hw->st_asm330lhhx_hrtimer, CLOCK_MONOTONIC,
-			HRTIMER_MODE_REL);
-	hw->st_asm330lhhx_hrtimer.function = st_asm330lhhx_timer_function;
-}
 static int __maybe_unused dump_registers(const char *info,
 					 struct st_asm330lhhx_hw *hw)
 {
@@ -2382,9 +2352,6 @@ int st_asm330lhhx_probe(struct device *dev, int irq,
 	err = asm330_acc_gyro_early_buff_init(hw);
 	if (err != 1)
 		return err;
-
-	if (hw->asm330_hrtimer)
-		st_asm330lhhx_hrtimer_init(hw);
 
 	st_asm330lhhx_enable_acc_gyro(hw);
 

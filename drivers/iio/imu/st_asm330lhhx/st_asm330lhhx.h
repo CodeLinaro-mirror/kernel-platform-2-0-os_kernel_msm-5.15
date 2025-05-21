@@ -676,8 +676,6 @@ struct st_asm330lhhx_hw {
 
 	struct iio_dev *iio_devs[ST_ASM330LHHX_ID_MAX];
 	int enable_gpio;
-	bool asm330_hrtimer;
-	struct hrtimer st_asm330lhhx_hrtimer;
 
 	struct wakeup_source *ws;
 };
@@ -891,8 +889,6 @@ int asm330lhhx_check_acc_gyro_early_buff_enable_flag(
 		struct st_asm330lhhx_sensor *sensor);
 int asm330lhhx_check_sensor_enable_flag(
 		struct st_asm330lhhx_sensor *sensor, bool enable);
-void st_asm330lhhx_set_cpu_idle_state(bool value);
-void st_asm330lhhx_hrtimer_reset(struct st_asm330lhhx_hw *hw, s64 irq_delta_ts);
 int st_asm330lhhx_shub_probe(struct st_asm330lhhx_hw *hw);
 int st_asm330lhhx_shub_set_enable(struct st_asm330lhhx_sensor *sensor,
 				  bool enable);

@@ -96,9 +96,6 @@ inline int st_asm330lhh_reset_hwts(struct st_asm330lhh_hw *hw)
 	hw->hw_ts_high = 0;
 	hw->tsample = 0ull;
 
-	if (hw->asm330_hrtimer)
-		st_asm330lhh_set_cpu_idle_state(true);
-
 	return st_asm330lhh_write_atomic(hw, ST_ASM330LHH_REG_TIMESTAMP2_ADDR,
 					 sizeof(data), &data);
 }
@@ -589,9 +586,6 @@ static irqreturn_t st_asm330lhh_handler_irq(int irq, void *private)
 	hw->delta_ts = ts - hw->ts;
 	hw->ts = ts;
 
-	if (hw->asm330_hrtimer)
-		st_asm330lhh_hrtimer_reset(hw, hw->delta_ts);
-
 	return IRQ_WAKE_THREAD;
 }
 
@@ -603,9 +597,6 @@ static irqreturn_t st_asm330lhh_handler_thread(int irq, void *private)
 	st_asm330lhh_read_fifo(hw);
 	clear_bit(ST_ASM330LHH_HW_FLUSH, &hw->state);
 	mutex_unlock(&hw->fifo_lock);
-
-	if (hw->asm330_hrtimer)
-		st_asm330lhh_set_cpu_idle_state(false);
 
 	return IRQ_HANDLED;
 }

@@ -67,9 +67,6 @@ static inline int st_asm330lhhx_reset_hwts(struct st_asm330lhhx_hw *hw)
 	hw->hw_ts_high = 0;
 	hw->tsample = 0ull;
 
-	if (hw->asm330_hrtimer)
-		st_asm330lhhx_set_cpu_idle_state(true);
-
 	return st_asm330lhhx_write_locked(hw,
 				      ST_ASM330LHHX_REG_TIMESTAMP2_ADDR,
 				      data);
@@ -628,9 +625,6 @@ static irqreturn_t st_asm330lhhx_handler_irq(int irq, void *private)
 	hw->delta_ts = ts - hw->ts;
 	hw->ts = ts;
 
-	if (hw->asm330_hrtimer)
-		st_asm330lhhx_hrtimer_reset(hw, hw->delta_ts);
-
 	return IRQ_WAKE_THREAD;
 }
 
@@ -640,8 +634,6 @@ static irqreturn_t st_asm330lhhx_handler_thread(int irq, void *private)
 	int notify = 0;
 
 	mutex_lock(&hw->handler_lock);
-	if (hw->asm330_hrtimer)
-		st_asm330lhhx_set_cpu_idle_state(false);
 
 #ifdef CONFIG_IIO_ST_ASM330LHHX_MLC
 	notify = st_asm330lhhx_mlc_check_status(hw);
