@@ -2,7 +2,7 @@
 
 // Copyright (c) 2018-19, Linaro Limited
 // Copyright (c) 2021, The Linux Foundation. All rights reserved.
-// Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+// Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
 
 #include <linux/module.h>
 #include <linux/of.h>
@@ -4818,6 +4818,11 @@ static ssize_t nw_loopback_handling_config_sysfs(struct device *dev,
 		return -EINVAL;
 	}
 
+	if (!in_buf) {
+		ETHQOSERR("Error in allocating memory for in_buf\n");
+		return -EINVAL;
+	}
+
 	ret = sscanf(in_buf, "%d", &config);
 	if (ret != 1) {
 		ETHQOSERR("Error in reading option from user");
@@ -6284,6 +6289,11 @@ static ssize_t ethqos_mac_recovery_enable(struct file *file,
 	int i;
 	struct qcom_ethqos *ethqos = pethqos[0];
 
+	if (!in_buf) {
+		ETHQOSERR("Error in allocating memory for in_buf\n");
+		return -EINVAL;
+	}
+
 	if (sizeof(in_buf) < count) {
 		ETHQOSERR("emac string is too long - count=%u\n", count);
 		return -EFAULT;
@@ -7212,7 +7222,7 @@ static int qcom_ethqos_vm_notifier(struct notifier_block *nb,
 	struct qcom_ethqos *ethqos = container_of(nb, struct qcom_ethqos, vm_nb);
 	struct stmmac_priv *priv = qcom_ethqos_get_priv(ethqos);
 	gh_vmid_t cb_vm_id = *(gh_vmid_t *)ptr;
-	gh_vmid_t v2x_vm_id;
+	gh_vmid_t v2x_vm_id = 0;
 	int result;
 
 	if (event == GH_VM_BEFORE_POWERUP) {
@@ -7475,7 +7485,7 @@ int qcom_ethqos_bring_up_phy_if(struct device *dev, bool client_mode)
 			ethqos->curr_phy_state = ETHQOS_PHY_STATE_UP;
 		}
 		fixed_phy_node = of_get_child_by_name(pdev->dev.of_node, "fixed-link");
-		if (of_device_is_available(fixed_phy_node)) {
+		if (fixed_phy_node && of_device_is_available(fixed_phy_node)) {
 
 			speed_prop = kzalloc(sizeof(*speed_prop), GFP_KERNEL);
 
@@ -7519,7 +7529,7 @@ int qcom_ethqos_bring_up_phy_if(struct device *dev, bool client_mode)
 	}
 
 	if (!priv->plat->mac2mac_en && !priv->plat->fixed_phy_mode) {
-		if (priv->phydev->drv->get_features &&
+		if (priv->phydev && priv->phydev->drv->get_features &&
 		    priv->plat->interface ==  PHY_INTERFACE_MODE_USXGMII &&
 		    !priv->plat->mac2mac_en)
 			priv->phydev->drv->get_features(priv->phydev);
