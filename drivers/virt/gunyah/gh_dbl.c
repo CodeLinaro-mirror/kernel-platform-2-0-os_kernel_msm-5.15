@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/slab.h>
@@ -650,8 +650,10 @@ int gh_dbl_reset_cap_info(enum gh_dbl_label label, int direction, int *irq)
 err_unlock:
 	spin_unlock(&cap_table_entry->cap_entry_lock);
 
-	if (*irq && !ret)
-		free_irq(*irq, cap_table_entry);
+	if (*irq && !ret) {
+		if (irq_has_action(*irq))
+			free_irq(*irq, cap_table_entry);
+	}
 
 	return ret;
 }

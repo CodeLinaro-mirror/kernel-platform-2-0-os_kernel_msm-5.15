@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -305,13 +305,15 @@ static int gh_sec_vm_loader_load_fw(struct gh_sec_vm_dev *vm_dev,
 long gh_vm_ioctl_set_fw_name(struct gh_vm *vm, unsigned long arg)
 {
 	struct gh_sec_vm_dev *sec_vm_dev;
-	struct gh_fw_name vm_fw_name;
 	struct device *dev;
 	long ret = -EINVAL;
 	char marker_svm_creating[80] = {'\0'};
+	struct gh_fw_name vm_fw_name = { .name = {0} };
 
-	if (copy_from_user(&vm_fw_name, (void __user *)arg, sizeof(vm_fw_name)))
+	if (copy_from_user(&vm_fw_name, (void __user *)arg, sizeof(vm_fw_name))) {
+		pr_err("%s:Copy from user failed\n", __func__);
 		return -EFAULT;
+	}
 
 	vm_fw_name.name[GH_VM_FW_NAME_MAX - 1] = '\0';
 	mutex_lock(&vm->vm_lock);
@@ -322,6 +324,9 @@ long gh_vm_ioctl_set_fw_name(struct gh_vm *vm, unsigned long arg)
 		goto err_fw_name;
 	}
 
+
+	scnprintf(vm->fw_name, ARRAY_SIZE(vm->fw_name),
+						"%s", vm_fw_name.name);
 	sec_vm_dev = get_sec_vm_dev_by_name(vm_fw_name.name);
 	if (!sec_vm_dev) {
 		pr_err("Requested Secure VM %s not supported\n",
@@ -341,8 +346,6 @@ long gh_vm_ioctl_set_fw_name(struct gh_vm *vm, unsigned long arg)
 		goto err_fw_name;
 	}
 
-	scnprintf(vm->fw_name, ARRAY_SIZE(vm->fw_name),
-						"%s", vm_fw_name.name);
 
 	mutex_unlock(&vm->vm_lock);
 
