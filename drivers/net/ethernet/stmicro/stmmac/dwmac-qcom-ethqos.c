@@ -2,7 +2,7 @@
 
 // Copyright (c) 2018-19, Linaro Limited
 // Copyright (c) 2021, The Linux Foundation. All rights reserved.
-// Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+// Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
 
 #include <linux/module.h>
 #include <linux/of.h>
@@ -6188,6 +6188,20 @@ static void qcom_ethqos_unregister_panic_notifier(struct qcom_ethqos *ethqos)
 	}
 }
 
+static int dwmac_enable_serdes_clocks(struct net_device *ndev)
+{
+	int ret = 0;
+
+	struct stmmac_priv *priv = netdev_priv(ndev);
+	struct qcom_ethqos *ethqos = priv->plat->bsp_priv;
+
+	ret = qcom_ethqos_enable_serdes_clocks(ethqos);
+	if (ret)
+		return -EINVAL;
+
+	return ret;
+}
+
 static int ethqos_serdes_power_saving(struct net_device *ndev, void *priv,
 				      bool power_state, bool needs_serdes_reset)
 {
@@ -6997,6 +7011,7 @@ static int qcom_ethqos_probe(struct platform_device *pdev)
 		plat_dat->serdes_powerup = ethqos_serdes_power_up;
 		plat_dat->serdes_powersaving = ethqos_serdes_power_saving;
 		plat_dat->xpcs_linkup = ethqos_xpcs_link_up;
+		plat_dat->enable_serdes_clocks = dwmac_enable_serdes_clocks;
 	}
 
 	if (of_property_read_bool(pdev->dev.of_node, "qcom,arm-smmu")) {

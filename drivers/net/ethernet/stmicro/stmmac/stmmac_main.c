@@ -12,6 +12,7 @@
 	http://www.stlinux.com
   Support available at:
 	https://bugzilla.stlinux.com/
+	Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
 *******************************************************************************/
 
 #include <linux/clk.h>
@@ -1295,7 +1296,7 @@ static void stmmac_mac_link_up(struct phylink_config *config,
 
 	if (priv->plat->serdes_powersaving)
 		priv->plat->serdes_powersaving(to_net_dev(config->dev),
-							  priv->plat->bsp_priv, true, true);
+							  priv->plat->bsp_priv, true, false);
 
 	if (priv->hw->qxpcs) {
 		ret = qcom_xpcs_serdes_loopback(priv->hw->qxpcs, false);
@@ -4446,7 +4447,12 @@ static int stmmac_open(struct net_device *dev)
 		pm_runtime_put_noidle(priv->device);
 		return ret;
 	}
-
+	if (mode == PHY_INTERFACE_MODE_SGMII ||
+	    mode == PHY_INTERFACE_MODE_USXGMII) {
+		ret = priv->plat->enable_serdes_clocks(dev);
+		if (ret)
+			return -EINVAL;
+	}
 	if (!priv->plat->mac2mac_en &&
 	    (!priv->plat->fixed_phy_mode ||
 	    (priv->plat->fixed_phy_mode && priv->plat->fixed_phy_mode_needs_mdio)) &&
