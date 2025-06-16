@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2024, Qualcomm Innovation Center, Inc. All rights reserved. */
+/* Copyright (c) 2024-2025, Qualcomm Innovation Center, Inc. All rights reserved. */
 
 #include <linux/platform_device.h>
 #include <linux/device.h>
@@ -37,7 +37,7 @@ struct qrtr_wakeup_driver {
 	wait_queue_head_t readq;
 	bool read_data;
 	spinlock_t read_data_lock;      /* lock to protect read_data */
-	struct qrtr_wakeup_info info[];
+	struct qrtr_wakeup_info *info;
 } wake_drv;
 
 static unsigned int max_wakeup_entry = 1;
@@ -52,6 +52,7 @@ static ssize_t qrtr_max_wk_entry_store(struct device *dev, struct device_attribu
 				       const char *buf, size_t count)
 {
 	unsigned int max_wk, max_wakeup_entry_old;
+	struct qrtr_wakeup_info *info;
 	unsigned long flags;
 	int ret, i;
 
@@ -65,6 +66,13 @@ static ssize_t qrtr_max_wk_entry_store(struct device *dev, struct device_attribu
 
 	spin_lock_irqsave(&max_entry_lock, flags);
 	if (max_wk > max_wakeup_entry) {
+		info = krealloc(wake_drv.info, sizeof(struct qrtr_wakeup_info) * max_wk,
+				GFP_KERNEL);
+		if (!info) {
+			spin_unlock_irqrestore(&max_entry_lock, flags);
+			return -ENOMEM;
+		}
+		wake_drv.info = info;
 		max_wakeup_entry_old = max_wakeup_entry;
 		for (i = max_wakeup_entry_old; i < max_wk; i++) {
 			memset(&wake_drv.info[i], 0, sizeof(struct qrtr_wakeup_info));
@@ -200,6 +208,11 @@ int qrtr_wakeup_info_init(void)
 		goto fail_dev_create;
 	}
 
+	wake_drv.info = kzalloc(sizeof(*wake_drv.info), GFP_KERNEL);
+	if (!wake_drv.info) {
+		device_destroy(wake_drv.qrtr_wake_class, wake_drv.qrtr_wake_major);
+		goto fail_dev_create;
+	}
 	wake_drv.info[0].version = INFO_VERSION_1;
 	wake_drv.info[0].svc_id = -1;
 	wake_drv.info[0].msg_id = -1;
@@ -219,6 +232,7 @@ fail_class:
 
 void qrtr_wakeup_info_exit(void)
 {
+	kfree(wake_drv.info);
 	device_destroy(wake_drv.qrtr_wake_class, wake_drv.qrtr_wake_major);
 	class_destroy(wake_drv.qrtr_wake_class);
 	cdev_del(wake_drv.cdev);
