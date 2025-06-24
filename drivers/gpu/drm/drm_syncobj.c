@@ -352,10 +352,10 @@ EXPORT_SYMBOL(drm_syncobj_replace_fence);
  */
 static int drm_syncobj_assign_null_handle(struct drm_syncobj *syncobj)
 {
-	struct dma_fence *fence = dma_fence_allocate_private_stub_with_timestamp(ktime_get());
+	struct dma_fence *fence = dma_fence_allocate_private_stub();
 
-	if (!fence)
-		return -ENOMEM;
+	if (IS_ERR(fence))
+		return PTR_ERR(fence);
 
 	drm_syncobj_replace_fence(syncobj, fence);
 	dma_fence_put(fence);
