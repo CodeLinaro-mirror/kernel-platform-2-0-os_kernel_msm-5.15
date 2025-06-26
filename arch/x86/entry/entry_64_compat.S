@@ -114,6 +114,9 @@ SYM_INNER_LABEL(entry_SYSENTER_compat_after_hwframe, SYM_L_GLOBAL)
 
 	cld
 
+	IBRS_ENTER
+	UNTRAIN_RET
+
 	/*
 	 * SYSENTER doesn't filter flags, so we need to clear NT and AC
 	 * ourselves.  To save a few cycles, we can check whether
@@ -136,16 +139,6 @@ SYM_INNER_LABEL(entry_SYSENTER_compat_after_hwframe, SYM_L_GLOBAL)
 	testl	$X86_EFLAGS_NT|X86_EFLAGS_AC|X86_EFLAGS_TF, EFLAGS(%rsp)
 	jnz	.Lsysenter_fix_flags
 .Lsysenter_flags_fixed:
-
-	/*
-	 * CPU bugs mitigations mechanisms can call other functions. They
-	 * should be invoked after making sure TF is cleared because
-	 * single-step is ignored only for instructions inside the
-	 * entry_SYSENTER_compat function.
-	 */
-	IBRS_ENTER
-	UNTRAIN_RET
-	CLEAR_BRANCH_HISTORY
 
 	movq	%rsp, %rdi
 	call	do_SYSENTER_32
@@ -266,7 +259,6 @@ SYM_INNER_LABEL(entry_SYSCALL_compat_after_hwframe, SYM_L_GLOBAL)
 
 	IBRS_ENTER
 	UNTRAIN_RET
-	CLEAR_BRANCH_HISTORY
 
 	movq	%rsp, %rdi
 	call	do_fast_syscall_32
@@ -327,7 +319,6 @@ sysret32_from_system_call:
 	xorl	%r9d, %r9d
 	xorl	%r10d, %r10d
 	swapgs
-	CLEAR_CPU_BUFFERS
 	sysretl
 SYM_CODE_END(entry_SYSCALL_compat)
 
@@ -430,7 +421,6 @@ SYM_CODE_START(entry_INT80_compat)
 
 	IBRS_ENTER
 	UNTRAIN_RET
-	CLEAR_BRANCH_HISTORY
 
 	movq	%rsp, %rdi
 	call	do_int80_syscall_32
