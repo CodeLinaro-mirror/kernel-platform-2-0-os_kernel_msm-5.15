@@ -7020,6 +7020,8 @@ static int qcom_ethqos_probe(struct platform_device *pdev)
 		plat_dat->handle_mac_err = dwmac_qcom_handle_mac_err;
 	plat_dat->enable_pfc = of_property_read_bool(np, "enable-pfc");
 	plat_dat->qos_use_skprio = of_property_read_bool(np, "qos-use-skprio");
+	if (plat_dat->has_xgmac)
+		plat_dat->insert_ts_pktid = true;
 
 	if (plat_dat->interface == PHY_INTERFACE_MODE_SGMII ||
 	    plat_dat->interface == PHY_INTERFACE_MODE_USXGMII) {
