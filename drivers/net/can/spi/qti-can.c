@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 
 /* Copyright (c) 2015-2021, The Linux Foundation. All rights reserved. */
-/* Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved. */
+// Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
 
 #include <linux/interrupt.h>
 #include <linux/module.h>
@@ -1907,6 +1907,12 @@ cleanup_privdata:
 	return NULL;
 }
 
+static const struct spi_device_id qti_can_spi_ids[] = {
+	{ "nxp,mpc5746c", 0},
+	{ "renesas,rh850", 0},
+	{  }
+};
+
 static const struct of_device_id qti_can_match_table[] = {
 	{ .compatible = "qcom,renesas,rh850" },
 	{ .compatible = "qcom,nxp,mpc5746c" },
@@ -2389,6 +2395,7 @@ static struct spi_driver qti_can_driver = {
 	.probe = qti_can_probe,
 	.remove = qti_can_remove,
 	.shutdown = qti_can_shutdown,
+	.id_table = qti_can_spi_ids,
 };
 module_spi_driver(qti_can_driver);
 
