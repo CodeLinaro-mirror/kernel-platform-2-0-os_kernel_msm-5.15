@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2024-2025, Qualcomm Innovation Center, Inc. All rights reserved. */
+/* Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries. */
 
 #include <linux/platform_device.h>
 #include <linux/device.h>
@@ -183,6 +183,8 @@ int qrtr_wakeup_info_init(void)
 		return -ENOMEM;
 	}
 	wake_drv.cdev = cdev_alloc();
+	if (!wake_drv.cdev)
+		return -ENODEV;
 	wake_drv.cdev->ops = &qrtr_wakeup_fops;
 	cdev_add(wake_drv.cdev, wake_drv.qrtr_wake_major, 1);
 	wake_drv.qrtr_wake_class = class_create(THIS_MODULE, "qrtr_wakeup_class");
