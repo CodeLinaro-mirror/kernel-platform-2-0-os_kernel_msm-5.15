@@ -2277,44 +2277,43 @@ static int qti_can_restore(struct device *dev)
 
 	if (spi) {
 		priv_data = spi_get_drvdata(spi);
+		if (priv_data) {
+			priv_data->probe_query_resp = false;
+
+			while ((query_err != 0) && (retry < QTI_CAN_FW_QUERY_RETRY_COUNT) &&
+			       (!(priv_data->probe_query_resp))) {
+				dev_dbg(dev, "Trying to query fw version %d\n", retry);
+				query_err = qti_can_query_firmware_version(priv_data);
+				priv_data->assembly_buffer_size = 0;
+				retry++;
+			}
+			dev_info(dev, "Retry count for fw version query is %d\n", retry);
+			if (query_err) {
+				dev_err(&priv_data->spidev->dev, "QTI CAN probe failed\n");
+				err = -ENODEV;
+			goto free_irq;
+			}
+
+			if (priv_data->univ_acc_filter_flag) {
+				filter_request = kzalloc(sizeof(*filter_request), GFP_KERNEL);
+				if (!filter_request)
+					return -ENOMEM;
+
+				filter_request->can_if = 0;
+				filter_request->mid = 0;
+				filter_request->mask = 0x40000000;
+				qti_can_add_filter(dev, filter_request);
+
+				dev_info(dev, "universal acceptance filter added!\n", retry);
+
+				priv_data->univ_acc_filter_flag = false;
+				kfree(filter_request);
+			}
+		}
 	} else {
 		ret = -1;
 	}
 
-	if (priv_data) {
-		priv_data->probe_query_resp = false;
-
-		while ((query_err != 0) && (retry < QTI_CAN_FW_QUERY_RETRY_COUNT) &&
-		       (!(priv_data->probe_query_resp))) {
-			dev_dbg(dev, "Trying to query fw version %d\n", retry);
-			query_err = qti_can_query_firmware_version(priv_data);
-			priv_data->assembly_buffer_size = 0;
-			retry++;
-		}
-		dev_info(dev, "Retry count for fw version query is %d\n", retry);
-		if (query_err) {
-			dev_err(&priv_data->spidev->dev, "QTI CAN probe failed\n");
-			err = -ENODEV;
-			goto free_irq;
-		}
-
-	}
-
-	if (priv_data->univ_acc_filter_flag) {
-		filter_request = kzalloc(sizeof(*filter_request), GFP_KERNEL);
-		if (!filter_request)
-			return -ENOMEM;
-
-		filter_request->can_if = 0;
-		filter_request->mid = 0;
-		filter_request->mask = 0x40000000;
-		qti_can_add_filter(dev, filter_request);
-
-		dev_info(dev, "universal acceptance filter added!\n", retry);
-
-		priv_data->univ_acc_filter_flag = false;
-		kfree(filter_request);
-	}
 	return 0;
 
 free_irq:
