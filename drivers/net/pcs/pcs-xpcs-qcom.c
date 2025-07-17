@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020 Synopsys, Inc. and/or its affiliates.
- * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * Synopsys DesignWare XPCS helpers
  *
  * Author: Jose Abreu <Jose.Abreu@synopsys.com>
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/delay.h>
@@ -1293,29 +1293,31 @@ void qcom_xpcs_link_up_usxgmii(struct dw_xpcs_qcom *xpcs, int speed, phy_interfa
 
 	mmd_ctrl = qcom_xpcs_write(xpcs, DW_SR_MII_MMD_CTRL, mmd_ctrl);
 
-	//enable c37 autoneg
-	ret = qcom_xpcs_read(xpcs, DW_SR_MII_MMD_CTRL);
-	if (ret < 0)
-		goto read_err;
+	if (xpcs->c37_an_en) {
+		//enable c37 autoneg
+		ret = qcom_xpcs_read(xpcs, DW_SR_MII_MMD_CTRL);
+		if (ret < 0)
+			goto read_err;
 
-	ret = qcom_xpcs_write(xpcs, DW_SR_MII_MMD_CTRL, ret | AN_CL37_EN);
+		ret = qcom_xpcs_write(xpcs, DW_SR_MII_MMD_CTRL, ret | AN_CL37_EN);
 
-	for (i = 0; i < 100; ++i) {
-		intr_stat = qcom_xpcs_read(xpcs, DW_VR_MII_AN_INTR_STS);
-		if (intr_stat & DW_VR_MII_ANCMPLT_INTR) {
-			XPCSINFO("Autonegotiation is finished.\n");
-			break;
+		for (i = 0; i < 100; ++i) {
+			intr_stat = qcom_xpcs_read(xpcs, DW_VR_MII_AN_INTR_STS);
+			if (intr_stat & DW_VR_MII_ANCMPLT_INTR) {
+				XPCSINFO("Autonegotiation is finished.\n");
+				break;
+			}
+			usleep_range(1, 1);
 		}
-		usleep_range(1, 1);
-	}
 
-	if (!(intr_stat & DW_VR_MII_ANCMPLT_INTR)) {
-		XPCSINFO("Autonegotiation is still not finished.\n");
-		return;
-	}
+		if (!(intr_stat & DW_VR_MII_ANCMPLT_INTR)) {
+			XPCSINFO("Autonegotiation is still not finished.\n");
+			return;
+		}
 
-	ret = qcom_xpcs_write(xpcs, DW_VR_MII_AN_INTR_STS,
-			      intr_stat & ~DW_VR_MII_ANCMPLT_INTR);
+		ret = qcom_xpcs_write(xpcs, DW_VR_MII_AN_INTR_STS,
+				      intr_stat & ~DW_VR_MII_ANCMPLT_INTR);
+	}
 
 	ret = qcom_xpcs_read(xpcs, DW_VR_MII_PCS_DIG_CTRL1);
 	if (ret < 0)
