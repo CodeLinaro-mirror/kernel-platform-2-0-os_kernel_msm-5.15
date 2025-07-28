@@ -381,5 +381,6 @@ struct plat_stmmacenet_data {
 	bool qos_supported;
 	bool enable_aux_ts;
 	bool tc_select_queue;
+	bool insert_ts_pktid;
 };
 #endif
