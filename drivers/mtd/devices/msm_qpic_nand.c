@@ -2,7 +2,7 @@
 /*
  * Copyright (C) 2007 Google, Inc.
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include "msm_qpic_nand.h"
@@ -1124,7 +1124,7 @@ static void msm_nand_init_sysfs(struct device *dev)
 	int err = 0;
 	struct msm_nand_info *info = dev_get_drvdata(dev);
 
-	sysfs_attr_init(&nand_uuid_data);
+	sysfs_attr_init(&nand_uuid_data.attr);
 	err = device_create_file(dev, &nand_uuid_data);
 	if (err)
 		pr_err("sysfs entry create failed %d\n", err);
