@@ -4078,9 +4078,10 @@ static ssize_t read_qos_regs(struct file *file,
 	struct qcom_ethqos *ethqos = file->private_data;
 	struct stmmac_priv *priv;
 	char *buf;
-	u32 vlan;
+	u32 vlan = 0;
 	u32 quant_weight, send_slope, high_cred, low_cred;
-	u32 l3l4_ctrl, l4_addr, l3_addr0, l3_addr1, l3_addr2, l3_addr3;
+	u32 l3l4_ctrl = 0, l4_addr = 0, l3_addr0 = 0;
+	u32 l3_addr1 = 0, l3_addr2 = 0, l3_addr3 = 0;
 	int len = 0;
 	int ret;
 	int i;
@@ -7653,13 +7654,13 @@ int qcom_ethqos_bring_up_phy_if(struct device *dev, bool client_mode)
 		    !priv->plat->mac2mac_en)
 			priv->phydev->drv->get_features(priv->phydev);
 
-		if (!priv->plat->mac2mac_en) {
+		if (!priv->plat->mac2mac_en && priv->phydev) {
 			phydev = priv->phydev;
 			rtnl_lock();
 			phylink_connect_phy(priv->phylink, priv->phydev);
 			rtnl_unlock();
 
-			if (phydev->drv->phy_id == ETH_RTK_PHY_ID_RTL8261N) {
+			if (phydev && phydev->drv->phy_id == ETH_RTK_PHY_ID_RTL8261N) {
 				if (phydev->interface == PHY_INTERFACE_MODE_USXGMII) {
 					ETHQOSDBG("set_max_speed 10G\n");
 					phy_set_max_speed(phydev, SPEED_10000);
