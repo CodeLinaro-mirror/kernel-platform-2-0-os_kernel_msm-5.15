@@ -894,6 +894,9 @@ struct smi230_cfg {
 
 	/*! fifo watermark level */
 	uint8_t fifo_wm;
+
+	/*! power mode backup when system go to sleep*/
+	uint8_t power_bak;
 };
 
 struct smi230_gyro_regs {

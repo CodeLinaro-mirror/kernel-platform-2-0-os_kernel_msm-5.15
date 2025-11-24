@@ -2387,13 +2387,21 @@ int smi230_acc_remove(struct device *dev)
 
 int smi230_acc_shutdown(struct device *dev)
 {
+	struct smi230_client_data *client_data = dev_get_drvdata(dev);
 	int ret = 0;
+
+	/* Disable IRQ to prevent new threaded handlers */
+	disable_irq(client_data->IRQ);
 
 	mutex_lock(&interrupt_handling_lock);
 	p_smi230_dev->accel_cfg.power = SMI230_ACCEL_PM_SUSPEND;
 	PINFO("Sensor %s Shutdown: suspended", SENSOR_ACC_NAME);
 	ret = smi230_acc_set_power_mode(p_smi230_dev);
 	mutex_unlock(&interrupt_handling_lock);
+
+	/* Free IRQ to ensure no handler runs after shutdown */
+	free_irq(client_data->IRQ, client_data);
+
 	return ret;
 }
 
@@ -2815,6 +2823,8 @@ int smi230_acc_suspend(struct device *dev)
 {
 	int ret = 0;
 
+	//backup the power mode before sleeping
+	p_smi230_dev->accel_cfg.power_bak = p_smi230_dev->accel_cfg.power;
 	mutex_lock(&interrupt_handling_lock);
 	p_smi230_dev->accel_cfg.power = SMI230_ACCEL_PM_SUSPEND;
 	ret = smi230_acc_set_power_mode(p_smi230_dev);
@@ -2828,7 +2838,7 @@ int smi230_acc_resume(struct device *dev)
 	int ret = 0;
 
 	mutex_lock(&interrupt_handling_lock);
-	p_smi230_dev->accel_cfg.power = SMI230_ACCEL_PM_ACTIVE;
+	p_smi230_dev->accel_cfg.power = p_smi230_dev->accel_cfg.power_bak;
 	ret = smi230_acc_set_power_mode(p_smi230_dev);
 	PINFO("Sensor %s Resumed", SENSOR_ACC_NAME);
 	mutex_unlock(&interrupt_handling_lock);
@@ -2838,6 +2848,9 @@ int smi230_acc_resume(struct device *dev)
 int smi230_acc_freeze(struct device *dev)
 {
 	int ret = 0;
+
+	//backup the power mode before freezing
+	p_smi230_dev->accel_cfg.power_bak = p_smi230_dev->accel_cfg.power;
 
 	mutex_lock(&interrupt_handling_lock);
 	p_smi230_dev->accel_cfg.power = SMI230_ACCEL_PM_SUSPEND;
@@ -2852,7 +2865,7 @@ int smi230_acc_restore(struct device *dev)
 	int ret = 0;
 
 	mutex_lock(&interrupt_handling_lock);
-	p_smi230_dev->accel_cfg.power = SMI230_ACCEL_PM_ACTIVE;
+	p_smi230_dev->accel_cfg.power = p_smi230_dev->accel_cfg.power_bak;
 	PINFO("Sensor %s Restored", SENSOR_ACC_NAME);
 	ret = smi230_acc_set_power_mode(p_smi230_dev);
 	mutex_unlock(&interrupt_handling_lock);
