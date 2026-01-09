@@ -3,7 +3,7 @@
  * Copyright (C) 2006-2007 Adam Belay <abelay@novell.com>
  * Copyright (C) 2009 Intel Corporation
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/cpu.h>
@@ -487,7 +487,7 @@ static void ipi_raise(void *ignore, const struct cpumask *mask, const char *unus
 
 		if (spin_trylock_irqsave(&cpu_gov->lock, flags)) {
 			cpu_gov->ipi_pending = true;
-			update_ipi_history(cpu, now);
+			update_ipi_history(cpu);
 			spin_unlock_irqrestore(&cpu_gov->lock, flags);
 		}
 	}
