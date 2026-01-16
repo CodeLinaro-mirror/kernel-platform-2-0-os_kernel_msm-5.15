@@ -42,6 +42,7 @@
 #include <linux/kfifo.h>
 #include <linux/clk/qcom.h>
 #include <linux/random.h>
+#include <soc/qcom/boot_stats.h>
 
 #include "../pci.h"
 
@@ -5111,6 +5112,7 @@ static int msm_pcie_link_train(struct msm_pcie_dev_t *dev)
 		PCIE_DBG(dev, "Link is up after %d checkings\n",
 			link_check_count);
 		PCIE_INFO(dev, "PCIe RC%d link initialized\n", dev->rc_idx);
+		update_marker("M - PCIe RC link initialized");
 	} else {
 		PCIE_INFO(dev, "PCIe: Assert the reset of endpoint of RC%d.\n",
 			dev->rc_idx);
